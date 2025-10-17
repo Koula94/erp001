@@ -1,12 +1,12 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Search, Wrench, Calendar } from "lucide-react"
-import { equipment } from "@/lib/mock-data"
+import { api } from "@/lib/api"
 import { EquipmentFormDialog } from "./equipment-form-dialog"
 
 const statusColors = {
@@ -25,9 +25,31 @@ const conditionColors = {
 
 export function EquipmentTab() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [equipmentData, setEquipmentData] = useState(equipment)
+  const [equipmentData, setEquipmentData] = useState<any[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingEquipment, setEditingEquipment] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadEquipment()
+  }, [])
+
+  const loadEquipment = async () => {
+    try {
+      setLoading(true)
+      const response = await api.equipment.list() as any
+      console.log("Equipment API response:", response)
+      // Handle different response formats
+      const data = Array.isArray(response) ? response : 
+                   (response as any)?.results || (response as any)?.data || []
+      setEquipmentData(data)
+    } catch (error) {
+      console.error("Error loading equipment:", error)
+      setEquipmentData([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredEquipment = equipmentData.filter(
     (item) =>
@@ -35,34 +57,42 @@ export function EquipmentTab() {
       item.category.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const totalValue = equipmentData.reduce((sum, eq) => sum + eq.value, 0)
+  const totalValue = equipmentData.reduce((sum, eq) => sum + (eq.value || 0), 0)
   const availableCount = equipmentData.filter((eq) => eq.status === "available").length
 
-  const handleAddEquipment = (data: any) => {
-    const newEquipment = {
-      ...data,
-      id: `EQ-${String(equipmentData.length + 1).padStart(3, "0")}`,
+  const handleAddEquipment = async (data: any) => {
+    try {
+      const newEquipment = await api.equipment.create(data)
+      setEquipmentData([...equipmentData, newEquipment])
+    } catch (error) {
+      console.error("Error adding equipment:", error)
+      throw error
     }
-    setEquipmentData([...equipmentData, newEquipment])
   }
 
-  const handleEditEquipment = (data: any) => {
-    setEquipmentData(
-      equipmentData.map((eq) =>
-        eq.id === editingEquipment.id
-          ? {
-              ...data,
-              id: eq.id,
-            }
-          : eq,
-      ),
-    )
-    setEditingEquipment(null)
+  const handleEditEquipment = async (data: any) => {
+    try {
+      const updatedEquipment = await api.equipment.update(editingEquipment.id, data)
+      setEquipmentData(
+        equipmentData.map((eq) =>
+          eq.id === editingEquipment.id ? updatedEquipment : eq,
+        ),
+      )
+      setEditingEquipment(null)
+    } catch (error) {
+      console.error("Error updating equipment:", error)
+      throw error
+    }
   }
 
-  const handleDeleteEquipment = (id: string) => {
+  const handleDeleteEquipment = async (id: string) => {
     if (confirm("Are you sure you want to delete this equipment?")) {
-      setEquipmentData(equipmentData.filter((eq) => eq.id !== id))
+      try {
+        await api.equipment.delete(id)
+        setEquipmentData(equipmentData.filter((eq) => eq.id !== id))
+      } catch (error) {
+        console.error("Error deleting equipment:", error)
+      }
     }
   }
 
@@ -125,71 +155,81 @@ export function EquipmentTab() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredEquipment.map((item) => (
-          <Card key={item.id}>
-            <CardHeader>
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
-                  <CardTitle className="text-lg">{item.name}</CardTitle>
-                  <CardDescription>{item.category}</CardDescription>
+        {loading ? (
+          <div className="col-span-full text-center py-8">
+            Loading equipment...
+          </div>
+        ) : filteredEquipment.length === 0 ? (
+          <div className="col-span-full text-center py-8">
+            No equipment found
+          </div>
+        ) : (
+          filteredEquipment.map((item) => (
+            <Card key={item.id}>
+              <CardHeader>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">{item.name}</CardTitle>
+                    <CardDescription>{item.category}</CardDescription>
+                  </div>
+                  <Badge variant="outline" className={statusColors[item.status as keyof typeof statusColors]}>
+                    {item.status}
+                  </Badge>
                 </div>
-                <Badge variant="outline" className={statusColors[item.status]}>
-                  {item.status}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Condition:</span>
-                <Badge variant="outline" className={conditionColors[item.condition]}>
-                  {item.condition}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Location:</span>
-                <span className="font-medium">{item.location}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Value:</span>
-                <span className="font-medium">${item.value.toLocaleString()}</span>
-              </div>
-              {item.assignedProject && (
-                <div className="pt-2 border-t">
-                  <p className="text-xs text-muted-foreground mb-1">Assigned to:</p>
-                  <p className="text-sm font-medium">{item.assignedProject}</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Condition:</span>
+                  <Badge variant="outline" className={conditionColors[item.condition as keyof typeof conditionColors]}>
+                    {item.condition}
+                  </Badge>
                 </div>
-              )}
-              <div className="pt-2 border-t space-y-1">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Calendar className="h-3 w-3" />
-                  <span>Last: {new Date(item.lastMaintenance).toLocaleDateString()}</span>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Location:</span>
+                  <span className="font-medium">{item.location}</span>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Calendar className="h-3 w-3" />
-                  <span>Next: {new Date(item.nextMaintenance).toLocaleDateString()}</span>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Value:</span>
+                  <span className="font-medium">${(item.value || 0).toLocaleString()}</span>
                 </div>
-              </div>
-              <div className="pt-3 border-t flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 bg-transparent"
-                  onClick={() => openEditDialog(item)}
-                >
-                  Edit
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 text-red-600 hover:text-red-700 bg-transparent"
-                  onClick={() => handleDeleteEquipment(item.id)}
-                >
-                  Delete
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+                {item.assignedProject && (
+                  <div className="pt-2 border-t">
+                    <p className="text-xs text-muted-foreground mb-1">Assigned to:</p>
+                    <p className="text-sm font-medium">{item.assignedProject}</p>
+                  </div>
+                )}
+                <div className="pt-2 border-t space-y-1">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <span>Last: {new Date(item.lastMaintenance).toLocaleDateString()}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Calendar className="h-3 w-3" />
+                    <span>Next: {new Date(item.nextMaintenance).toLocaleDateString()}</span>
+                  </div>
+                </div>
+                <div className="pt-3 border-t flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 bg-transparent"
+                    onClick={() => openEditDialog(item)}
+                  >
+                    Edit
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-red-600 hover:text-red-700 bg-transparent"
+                    onClick={() => handleDeleteEquipment(item.id)}
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        )}
       </div>
 
       <EquipmentFormDialog

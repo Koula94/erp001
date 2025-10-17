@@ -34,6 +34,9 @@ export function MaterialFormDialog({ open, onOpenChange, onSubmit, initialData }
       maxStock: 0,
       unitPrice: 0,
       location: "",
+      supplier: "",
+      lastRestocked: new Date().toISOString().split('T')[0], // Default to today
+      status: "in-stock",
     },
   )
 
@@ -141,13 +144,36 @@ export function MaterialFormDialog({ open, onOpenChange, onSubmit, initialData }
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="location">Location *</Label>
+                <Input
+                  id="location"
+                  value={formData.location}
+                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  placeholder="Warehouse location"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="supplier">Supplier *</Label>
+                <Input
+                  id="supplier"
+                  value={formData.supplier}
+                  onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                  placeholder="Supplier name"
+                  required
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="location">Location *</Label>
+              <Label htmlFor="lastRestocked">Last Restocked Date *</Label>
               <Input
-                id="location"
-                value={formData.location}
-                onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                placeholder="Warehouse location"
+                id="lastRestocked"
+                type="date"
+                value={formData.lastRestocked}
+                onChange={(e) => setFormData({ ...formData, lastRestocked: e.target.value })}
                 required
               />
             </div>

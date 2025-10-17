@@ -1,13 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Plus, Search, AlertTriangle, Package } from "lucide-react"
-import { materials } from "@/lib/mock-data"
+import { api } from "@/lib/api"
 import { Progress } from "@/components/ui/progress"
 import { MaterialFormDialog } from "./material-form-dialog"
 
@@ -19,9 +19,31 @@ const statusColors = {
 
 export function MaterialsTab() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [materialsData, setMaterialsData] = useState(materials)
+  const [materialsData, setMaterialsData] = useState<any[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingMaterial, setEditingMaterial] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadMaterials()
+  }, [])
+
+  const loadMaterials = async () => {
+    try {
+      setLoading(true)
+      const response = await api.materials.list() as any
+      console.log("Materials API response:", response)
+      // Handle different response formats
+      const data = Array.isArray(response) ? response : 
+                   (response as any)?.results || (response as any)?.data || []
+      setMaterialsData(data)
+    } catch (error) {
+      console.error("Error loading materials:", error)
+      setMaterialsData([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const filteredMaterials = materialsData.filter(
     (material) =>
@@ -29,38 +51,72 @@ export function MaterialsTab() {
       material.category.toLowerCase().includes(searchQuery.toLowerCase()),
   )
 
-  const totalValue = materialsData.reduce((sum, mat) => sum + mat.totalValue, 0)
+  const totalValue = materialsData.reduce((sum, mat) => sum + (mat.totalValue || 0), 0)
   const lowStockCount = materialsData.filter((mat) => mat.status === "low-stock").length
 
-  const handleAddMaterial = (data: any) => {
-    const newMaterial = {
-      ...data,
-      id: `MAT-${String(materialsData.length + 1).padStart(3, "0")}`,
-      totalValue: data.quantity * data.unitPrice,
-      status: data.quantity <= data.minStock ? "low-stock" : data.quantity === 0 ? "out-of-stock" : "in-stock",
+  const handleAddMaterial = async (data: any) => {
+    try {
+      // Convert camelCase to snake_case for Django API
+      const apiData = {
+        name: data.name,
+        category: data.category,
+        quantity: data.quantity,
+        unit: data.unit,
+        min_stock: data.minStock,
+        max_stock: data.maxStock,
+        unit_price: data.unitPrice,
+        location: data.location,
+        supplier: data.supplier,
+        last_restocked: data.lastRestocked,
+        status: data.status || "in-stock",
+      }
+      console.log("Sending data to API:", apiData)
+      const newMaterial = await api.materials.create(apiData)
+      setMaterialsData([...materialsData, newMaterial])
+    } catch (error) {
+      console.error("Error adding material:", error)
+      throw error
     }
-    setMaterialsData([...materialsData, newMaterial])
   }
 
-  const handleEditMaterial = (data: any) => {
-    setMaterialsData(
-      materialsData.map((mat) =>
-        mat.id === editingMaterial.id
-          ? {
-              ...data,
-              id: mat.id,
-              totalValue: data.quantity * data.unitPrice,
-              status: data.quantity <= data.minStock ? "low-stock" : data.quantity === 0 ? "out-of-stock" : "in-stock",
-            }
-          : mat,
-      ),
-    )
-    setEditingMaterial(null)
+  const handleEditMaterial = async (data: any) => {
+    try {
+      // Convert camelCase to snake_case for Django API
+      const apiData = {
+        name: data.name,
+        category: data.category,
+        quantity: data.quantity,
+        unit: data.unit,
+        min_stock: data.minStock,
+        max_stock: data.maxStock,
+        unit_price: data.unitPrice,
+        location: data.location,
+        supplier: data.supplier,
+        last_restocked: data.lastRestocked,
+        status: data.status || "in-stock",
+      }
+      console.log("Sending update data to API:", apiData)
+      const updatedMaterial = await api.materials.update(editingMaterial.id, apiData)
+      setMaterialsData(
+        materialsData.map((mat) =>
+          mat.id === editingMaterial.id ? updatedMaterial : mat,
+        ),
+      )
+      setEditingMaterial(null)
+    } catch (error) {
+      console.error("Error updating material:", error)
+      throw error
+    }
   }
 
-  const handleDeleteMaterial = (id: string) => {
+  const handleDeleteMaterial = async (id: string) => {
     if (confirm("Are you sure you want to delete this material?")) {
-      setMaterialsData(materialsData.filter((mat) => mat.id !== id))
+      try {
+        await api.materials.delete(id)
+        setMaterialsData(materialsData.filter((mat) => mat.id !== id))
+      } catch (error) {
+        console.error("Error deleting material:", error)
+      }
     }
   }
 
@@ -143,54 +199,68 @@ export function MaterialsTab() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredMaterials.map((material) => {
-                const stockPercentage = (material.quantity / material.maxStock) * 100
-                return (
-                  <TableRow key={material.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{material.name}</p>
-                        <p className="text-xs text-muted-foreground">{material.id}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>{material.category}</TableCell>
-                    <TableCell>
-                      {material.quantity} {material.unit}
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1 min-w-[120px]">
-                        <Progress value={stockPercentage} className="h-2" />
-                        <p className="text-xs text-muted-foreground">
-                          {material.minStock} - {material.maxStock} {material.unit}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>{material.location}</TableCell>
-                    <TableCell>${material.unitPrice}</TableCell>
-                    <TableCell>${material.totalValue.toLocaleString()}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={statusColors[material.status]}>
-                        {material.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => openEditDialog(material)}>
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteMaterial(material.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8">
+                    Loading materials...
+                  </TableCell>
+                </TableRow>
+              ) : filteredMaterials.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={9} className="text-center py-8">
+                    No materials found
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredMaterials.map((material) => {
+                  const stockPercentage = (material.quantity / material.maxStock) * 100
+                  return (
+                    <TableRow key={material.id}>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{material.name}</p>
+                          <p className="text-xs text-muted-foreground">{material.id}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{material.category}</TableCell>
+                      <TableCell>
+                        {material.quantity} {material.unit}
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1 min-w-[120px]">
+                          <Progress value={stockPercentage} className="h-2" />
+                          <p className="text-xs text-muted-foreground">
+                            {material.minStock} - {material.maxStock} {material.unit}
+                          </p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{material.location}</TableCell>
+                      <TableCell>${material.unitPrice}</TableCell>
+                      <TableCell>${(material.totalValue || 0).toLocaleString()}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={statusColors[material.status as keyof typeof statusColors]}>
+                          {material.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-2">
+                          <Button variant="ghost" size="sm" onClick={() => openEditDialog(material)}>
+                            Edit
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteMaterial(material.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            Delete
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
             </TableBody>
           </Table>
         </CardContent>
