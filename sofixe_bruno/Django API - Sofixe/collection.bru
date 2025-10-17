@@ -1,0 +1,21 @@
+meta {
+  name: Django API - Sofixe
+}
+
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{auth_token}}
+}
+
+vars:pre-request {
+  base_url: http://127.0.0.1:8000
+  auth_token: 
+  refresh_token: 
+}
+
+docs {
+  Collection API Django avec authentification superadmin
+}

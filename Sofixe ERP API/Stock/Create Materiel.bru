@@ -1,0 +1,42 @@
+meta {
+  name: Create Materiel
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/api/stock/materials/
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    "name": "Excavator",
+    "category": "Heavy Machinery",
+    "status": "available",
+    "condition": "good",
+    "location": "Yard",
+    "assigned_to": null,
+    "purchase_date": "2023-05-10",
+    "last_maintenance": "2024-01-10",
+    "next_maintenance": "2024-04-10",
+    "value": 50000.00,
+    "unit": 50000.00,
+    "quantity": 500,
+    "min_stock": 5,
+    "max_stock": 5000,
+    "unit_price": 5000,
+    "supplier": 1,
+    "last_restocked": 5000,
+    "status": 1
+  }
+}
+
+settings {
+  encodeUrl: true
+}

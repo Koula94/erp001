@@ -1,0 +1,269 @@
+{
+  "version": "1",
+  "name": "Sofixe ERP/CRM API",
+  "type": "collection",
+  "docs": "Collection pour tester l'API Django Sofixe ERP/CRM",
+  "items": [
+    {
+      "name": "Authentification",
+      "type": "folder",
+      "items": [
+        {
+          "name": "Obtenir Token JWT",
+          "type": "http-request",
+          "request": {
+            "url": "http://127.0.0.1:8000/api/token/",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": {
+                "username": "admin",
+                "password": "admin123"
+              }
+            }
+          },
+          "docs": "Obtenir un token d'accès JWT"
+        },
+        {
+          "name": "Rafraîchir Token",
+          "type": "http-request",
+          "request": {
+            "url": "http://127.0.0.1:8000/api/token/refresh/",
+            "method": "POST",
+            "headers": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "json",
+              "json": {
+                "refresh": "{{refresh_token}}"
+              }
+            }
+          },
+          "docs": "Rafraîchir le token d'accès"
+        }
+      ]
+    },
+    {
+      "name": "Utilisateurs",
+      "type": "folder",
+      "items": [
+        {
+          "name": "Lister les utilisateurs",
+          "type": "http-request",
+          "request": {
+            "url": "http://127.0.0.1:8000/api/users/",
+            "method": "GET",
+            "headers": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ]
+          },
+          "docs": "Obtenir la liste des utilisateurs"
+        }
+      ]
+    },
+    {
+      "name": "CRM",
+      "type": "folder",
+      "items": [
+        {
+          "name": "Lister les clients",
+          "type": "http-request",
+          "request": {
+            "url": "http://127.0.0.1:8000/api/crm/clients/",
+            "method": "GET",
+            "headers": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ]
+          },
+          "docs": "Obtenir la liste des clients"
+        },
+        {
+          "name": "Lister les devis",
+          "type": "http-request",
+          "request": {
+            "url": "http://127.0.0.1:8000/api/crm/quotes/",
+            "method": "GET",
+            "headers": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ]
+          },
+          "docs": "Obtenir la liste des devis"
+        }
+      ]
+    },
+    {
+      "name": "Projets",
+      "type": "folder",
+      "items": [
+        {
+          "name": "Lister les projets",
+          "type": "http-request",
+          "request": {
+            "url": "http://127.0.0.1:8000/api/projects/",
+            "method": "GET",
+            "headers": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ]
+          },
+          "docs": "Obtenir la liste des projets"
+        }
+      ]
+    },
+    {
+      "name": "Finance",
+      "type": "folder",
+      "items": [
+        {
+          "name": "Lister les factures",
+          "type": "http-request",
+          "request": {
+            "url": "http://127.0.0.1:8000/api/finance/invoices/",
+            "method": "GET",
+            "headers": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ]
+          },
+          "docs": "Obtenir la liste des factures"
+        },
+        {
+          "name": "Lister les budgets",
+          "type": "http-request",
+          "request": {
+            "url": "http://127.0.0.1:8000/api/finance/budgets/",
+            "method": "GET",
+            "headers": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ]
+          },
+          "docs": "Obtenir la liste des budgets"
+        }
+      ]
+    },
+    {
+      "name": "Ressources Humaines",
+      "type": "folder",
+      "items": [
+        {
+          "name": "Lister les employés",
+          "type": "http-request",
+          "request": {
+            "url": "http://127.0.0.1:8000/api/hr/employees/",
+            "method": "GET",
+            "headers": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ]
+          },
+          "docs": "Obtenir la liste des employés"
+        },
+        {
+          "name": "Lister les congés",
+          "type": "http-request",
+          "request": {
+            "url": "http://127.0.0.1:8000/api/hr/leaves/",
+            "method": "GET",
+            "headers": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ]
+          },
+          "docs": "Obtenir la liste des demandes de congés"
+        }
+      ]
+    },
+    {
+      "name": "Stock",
+      "type": "folder",
+      "items": [
+        {
+          "name": "Lister les matériaux",
+          "type": "http-request",
+          "request": {
+            "url": "http://127.0.0.1:8000/api/stock/materials/",
+            "method": "GET",
+            "headers": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ]
+          },
+          "docs": "Obtenir la liste des matériaux"
+        },
+        {
+          "name": "Lister les équipements",
+          "type": "http-request",
+          "request": {
+            "url": "http://127.0.0.1:8000/api/stock/equipment/",
+            "method": "GET",
+            "headers": [
+              {
+                "name": "Authorization",
+                "value": "Bearer {{access_token}}"
+              }
+            ]
+          },
+          "docs": "Obtenir la liste des équipements"
+        }
+      ]
+    }
+  ],
+  "environments": [
+    {
+      "name": "Development",
+      "type": "environment",
+      "data": [
+        {
+          "name": "base_url",
+          "value": "http://127.0.0.1:8000",
+          "type": "text",
+          "enabled": true
+        },
+        {
+          "name": "access_token",
+          "value": "",
+          "type": "text",
+          "enabled": true
+        },
+        {
+          "name": "refresh_token",
+          "value": "",
+          "type": "text",
+          "enabled": true
+        }
+      ]
+    }
+  ]
+}

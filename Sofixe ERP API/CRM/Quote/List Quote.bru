@@ -1,0 +1,19 @@
+meta {
+  name: List Quote
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/api/crm/quotes/
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+settings {
+  encodeUrl: true
+}

@@ -1,0 +1,21 @@
+meta {
+  name: Sofixe ERP API
+}
+
+auth {
+  mode: bearer
+}
+
+auth:bearer {
+  token: {{access_token}}
+}
+
+vars:pre-request {
+  base_url: http://127.0.0.1:8000
+  access_token: 
+  refresh_token: 
+}
+
+docs {
+  Collection complète API Sofixe ERP avec authentification JWT
+}

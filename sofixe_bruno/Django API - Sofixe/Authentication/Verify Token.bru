@@ -1,0 +1,25 @@
+meta {
+  name: Verify Token
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{base_url}}/api/token/verify/
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "token": "{{auth_token}}"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

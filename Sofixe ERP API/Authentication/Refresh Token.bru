@@ -1,0 +1,39 @@
+meta {
+  name: Refresh Token
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{base_url}}/api/token/refresh/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "refresh": "{{refresh_token}}"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+      const data = res.getBody();
+      if (data.access) {
+          bru.setVar('access_token', data.access);
+          console.log('✅ Access token rafraîchi');
+      }
+  }
+}
+
+settings {
+  encodeUrl: true
+}
+
+docs {
+  Renouveler l'access token avec le refresh token
+}

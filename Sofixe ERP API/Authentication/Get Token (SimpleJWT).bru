@@ -1,0 +1,42 @@
+meta {
+  name: Get Token (SimpleJWT)
+  type: http
+  seq: 7
+}
+
+post {
+  url: {{base_url}}/api/token/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "username": "admin",
+    "password": "123456"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+      const data = res.getBody();
+      if (data.access) {
+          bru.setVar('access_token', data.access);
+      }
+      if (data.refresh) {
+          bru.setVar('refresh_token', data.refresh);
+      }
+  }
+}
+
+settings {
+  encodeUrl: true
+}
+
+docs {
+  Endpoint SimpleJWT standard pour obtenir les tokens
+}

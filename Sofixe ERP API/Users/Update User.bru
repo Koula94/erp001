@@ -1,0 +1,31 @@
+meta {
+  name: Update User
+  type: http
+  seq: 4
+}
+
+put {
+  url: {{base_url}}/api/users/2/
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+  Content-Type: application/json
+}
+
+body:json {
+  {
+     "id": 2,
+    "username": "admin",
+    "email": "admin@sofixe.com",
+    "first_name": "abdoulaye",
+    "last_name": "Diallo",
+    "role": "admin"
+  }
+}
+
+settings {
+  encodeUrl: true
+}

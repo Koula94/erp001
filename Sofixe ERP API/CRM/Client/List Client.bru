@@ -1,0 +1,19 @@
+meta {
+  name: List Client
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{base_url}}/api/crm/clients/
+  body: none
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+settings {
+  encodeUrl: true
+}

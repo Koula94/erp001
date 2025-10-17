@@ -1,0 +1,31 @@
+meta {
+  name: Update Projet
+  type: http
+  seq: 2
+}
+
+put {
+  url: {{base_url}}/api/projects/projects/
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    "name": "Construction d'un centre sportif docio professionnel juvenile de Labe",
+    "start_date": "2025-11-01",
+    "end_date": "2025-12-31",
+    "budget": 50000,
+    "description": "Description du projet test pour valider les champs.",
+    "client":3
+  }
+  
+}
+
+settings {
+  encodeUrl: true
+}

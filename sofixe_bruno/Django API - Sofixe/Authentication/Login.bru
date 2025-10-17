@@ -1,0 +1,46 @@
+meta {
+  name: Login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{base_url}}/api/token/
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "username": "admin@sofixe.com",
+    "email": "admin@sofixe.com",
+    "password": "123456"
+  }
+}
+
+script:post-response {
+  if (res.getStatus() === 200) {
+      const data = res.getBody();
+      if (data.token) {
+          bru.setVar('auth_token', data.token);
+      }
+      if (data.access) {
+          bru.setVar('auth_token', data.access);
+      }
+      if (data.refresh) {
+          bru.setVar('refresh_token', data.refresh);
+      }
+  }
+}
+
+settings {
+  encodeUrl: true
+}
+
+docs {
+  Connexion avec le compte superadmin
+}

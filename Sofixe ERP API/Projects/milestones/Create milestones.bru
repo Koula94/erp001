@@ -1,0 +1,24 @@
+meta {
+  name: Create milestones
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/api/projects/milestones/
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+body:json {
+  
+  
+}
+
+settings {
+  encodeUrl: true
+}

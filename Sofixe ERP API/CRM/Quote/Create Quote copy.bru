@@ -1,0 +1,28 @@
+meta {
+  name: Create Quote copy
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/api/crm/quotes/
+  body: json
+  auth: inherit
+}
+
+headers {
+  Authorization: Bearer {{access_token}}
+}
+
+body:json {
+  {
+    "project_name": "BBVB",
+    "amount": 100,
+    "valid_until": "2025-03-03",
+    "client":2
+  }
+}
+
+settings {
+  encodeUrl: true
+}
