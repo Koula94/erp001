@@ -16,6 +16,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
+import { api } from "@/lib/api"
+import type { User } from "@/lib/auth"
+import { getUserFullName } from "@/lib/auth"
 
 interface EmployeeFormDialogProps {
   open: boolean
@@ -33,6 +36,8 @@ export function EmployeeFormDialog({ open, onOpenChange, onSubmit, employee }: E
     status: "active",
     skills: "",
   })
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (employee) {
@@ -55,6 +60,53 @@ export function EmployeeFormDialog({ open, onOpenChange, onSubmit, employee }: E
       })
     }
   }, [employee, open])
+
+  // Fetch users when dialog opens
+  useEffect(() => {
+    if (open) {
+      fetchUsers()
+    }
+  }, [open])
+
+  const fetchUsers = async () => {
+    setLoading(true)
+    try {
+      console.log("Fetching users from API...")
+      const response = await api.users.list()
+      console.log("Raw API Response:", response)
+      console.log("Response type:", typeof response)
+      console.log("Is array?", Array.isArray(response))
+      
+      // Handle different response formats
+      let usersArray: User[] = []
+      
+      if (Array.isArray(response)) {
+        usersArray = response
+      } else if (response && typeof response === 'object') {
+        // Check if response has a results property (common in DRF pagination)
+        const responseObj = response as any
+        if (Array.isArray(responseObj.results)) {
+          usersArray = responseObj.results
+        } else if (Array.isArray(responseObj.data)) {
+          usersArray = responseObj.data
+        } else {
+          // Try to convert object values to array
+          usersArray = Object.values(responseObj)
+        }
+      }
+      
+      console.log("Final users array:", usersArray)
+      console.log("Number of users:", usersArray.length)
+      
+      setUsers(usersArray)
+    } catch (error) {
+      console.error("Failed to fetch users:", error)
+      console.error("Error details:", error)
+      setUsers([])
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -82,16 +134,29 @@ export function EmployeeFormDialog({ open, onOpenChange, onSubmit, employee }: E
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="user">User ID *</Label>
-                <Input
-                  id="user"
-                  type="number"
-                  value={formData.user}
-                  onChange={(e) => setFormData({ ...formData, user: e.target.value })}
-                  placeholder="Enter user ID"
-                  required
-                />
-                
+                <Label htmlFor="user">User *</Label>
+                <Select 
+                  value={formData.user} 
+                  onValueChange={(value) => setFormData({ ...formData, user: value })}
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loading ? "Loading users..." : "Select a user"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.length === 0 ? (
+                      <div className="px-2 py-1 text-sm text-muted-foreground">
+                        {loading ? "Loading users..." : "No users available"}
+                      </div>
+                    ) : (
+                      users.map((user) => (
+                        <SelectItem key={user.id} value={user.id}>
+                          {getUserFullName(user)} ({user.username})
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="employee_id">Employee ID *</Label>
