@@ -24,6 +24,34 @@ class Material(models.Model):
     def total_value(self):
         return self.quantity * self.unit_price
     
+    def calculate_status(self):
+        """Calculate material status based on quantity and stock levels"""
+        if self.quantity <= 0:
+            return 'out-of-stock'
+        elif self.quantity <= self.min_stock:
+            return 'low-stock'
+        else:
+            return 'in-stock'
+    
+    def update_quantity(self, transaction_type, quantity):
+        """Update material quantity based on transaction type"""
+        if transaction_type == 'in':
+            self.quantity += quantity
+        elif transaction_type == 'out':
+            self.quantity -= quantity
+            if self.quantity < 0:
+                self.quantity = 0
+        
+        # Update status based on new quantity
+        self.status = self.calculate_status()
+        
+        # Update last_restocked if it's an incoming transaction
+        if transaction_type == 'in':
+            from django.utils import timezone
+            self.last_restocked = timezone.now().date()
+        
+        self.save()
+    
     def __str__(self):
         return self.name
 
@@ -69,6 +97,17 @@ class StockTransaction(models.Model):
     date = models.DateTimeField(auto_now_add=True)
     reference = models.CharField(max_length=100)
     notes = models.TextField(blank=True)
+    
+    def save(self, *args, **kwargs):
+        """Override save to automatically update material quantity and status"""
+        is_new = self.pk is None
+        
+        # Call the original save method first
+        super().save(*args, **kwargs)
+        
+        # Update material quantity and status
+        if is_new and self.type in ['in', 'out']:
+            self.material.update_quantity(self.type, self.quantity)
     
     def __str__(self):
         return f"{self.type} - {self.material.name} - {self.quantity}"

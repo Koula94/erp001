@@ -35,15 +35,58 @@ export function MaterialFormDialog({ open, onOpenChange, onSubmit, initialData }
       unitPrice: 0,
       location: "",
       supplier: "",
-      lastRestocked: new Date().toISOString().split('T')[0], // Default to today
+      lastRestocked: new Date().toISOString().split('T')[0],
       status: "in-stock",
     },
   )
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+
+    // Required fields validation
+    if (!formData.name.trim()) newErrors.name = "Material name is required"
+    if (!formData.category) newErrors.category = "Category is required"
+    if (!formData.unit.trim()) newErrors.unit = "Unit is required"
+    if (!formData.location.trim()) newErrors.location = "Location is required"
+    if (!formData.supplier.trim()) newErrors.supplier = "Supplier is required"
+
+    // Numeric validation
+    if (formData.quantity < 0) newErrors.quantity = "Quantity cannot be negative"
+    if (formData.minStock < 0) newErrors.minStock = "Minimum stock cannot be negative"
+    if (formData.maxStock < 0) newErrors.maxStock = "Maximum stock cannot be negative"
+    if (formData.unitPrice < 0) newErrors.unitPrice = "Unit price cannot be negative"
+
+    // Logical validation
+    if (formData.maxStock > 0 && formData.minStock > formData.maxStock) {
+      newErrors.minStock = "Minimum stock cannot exceed maximum stock"
+    }
+
+    // Date validation
+    const today = new Date()
+    const restockedDate = new Date(formData.lastRestocked)
+    if (restockedDate > today) {
+      newErrors.lastRestocked = "Restock date cannot be in the future"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit(formData)
-    onOpenChange(false)
+    if (validateForm()) {
+      onSubmit(formData)
+      onOpenChange(false)
+    }
+  }
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData({ ...formData, [field]: value })
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors({ ...errors, [field]: "" })
+    }
   }
 
   return (
@@ -63,17 +106,19 @@ export function MaterialFormDialog({ open, onOpenChange, onSubmit, initialData }
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  className={errors.name ? "border-red-500" : ""}
                   required
                 />
+                {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category">Category *</Label>
                 <Select
                   value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  onValueChange={(value) => handleInputChange("category", value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={errors.category ? "border-red-500" : ""}>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -84,6 +129,7 @@ export function MaterialFormDialog({ open, onOpenChange, onSubmit, initialData }
                     <SelectItem value="Safety">Safety</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.category && <p className="text-sm text-red-500">{errors.category}</p>}
               </div>
             </div>
 
@@ -94,19 +140,23 @@ export function MaterialFormDialog({ open, onOpenChange, onSubmit, initialData }
                   id="quantity"
                   type="number"
                   value={formData.quantity}
-                  onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
+                  onChange={(e) => handleInputChange("quantity", Number(e.target.value))}
+                  className={errors.quantity ? "border-red-500" : ""}
                   required
                 />
+                {errors.quantity && <p className="text-sm text-red-500">{errors.quantity}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="unit">Unit *</Label>
                 <Input
                   id="unit"
                   value={formData.unit}
-                  onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                  onChange={(e) => handleInputChange("unit", e.target.value)}
                   placeholder="e.g., kg, m, pcs"
+                  className={errors.unit ? "border-red-500" : ""}
                   required
                 />
+                {errors.unit && <p className="text-sm text-red-500">{errors.unit}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="unitPrice">Unit Price *</Label>
@@ -115,9 +165,11 @@ export function MaterialFormDialog({ open, onOpenChange, onSubmit, initialData }
                   type="number"
                   step="0.01"
                   value={formData.unitPrice}
-                  onChange={(e) => setFormData({ ...formData, unitPrice: Number(e.target.value) })}
+                  onChange={(e) => handleInputChange("unitPrice", Number(e.target.value))}
+                  className={errors.unitPrice ? "border-red-500" : ""}
                   required
                 />
+                {errors.unitPrice && <p className="text-sm text-red-500">{errors.unitPrice}</p>}
               </div>
             </div>
 
@@ -128,9 +180,11 @@ export function MaterialFormDialog({ open, onOpenChange, onSubmit, initialData }
                   id="minStock"
                   type="number"
                   value={formData.minStock}
-                  onChange={(e) => setFormData({ ...formData, minStock: Number(e.target.value) })}
+                  onChange={(e) => handleInputChange("minStock", Number(e.target.value))}
+                  className={errors.minStock ? "border-red-500" : ""}
                   required
                 />
+                {errors.minStock && <p className="text-sm text-red-500">{errors.minStock}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="maxStock">Maximum Stock Level *</Label>
@@ -138,9 +192,11 @@ export function MaterialFormDialog({ open, onOpenChange, onSubmit, initialData }
                   id="maxStock"
                   type="number"
                   value={formData.maxStock}
-                  onChange={(e) => setFormData({ ...formData, maxStock: Number(e.target.value) })}
+                  onChange={(e) => handleInputChange("maxStock", Number(e.target.value))}
+                  className={errors.maxStock ? "border-red-500" : ""}
                   required
                 />
+                {errors.maxStock && <p className="text-sm text-red-500">{errors.maxStock}</p>}
               </div>
             </div>
 
@@ -150,20 +206,24 @@ export function MaterialFormDialog({ open, onOpenChange, onSubmit, initialData }
                 <Input
                   id="location"
                   value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  onChange={(e) => handleInputChange("location", e.target.value)}
                   placeholder="Warehouse location"
+                  className={errors.location ? "border-red-500" : ""}
                   required
                 />
+                {errors.location && <p className="text-sm text-red-500">{errors.location}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="supplier">Supplier *</Label>
                 <Input
                   id="supplier"
                   value={formData.supplier}
-                  onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                  onChange={(e) => handleInputChange("supplier", e.target.value)}
                   placeholder="Supplier name"
+                  className={errors.supplier ? "border-red-500" : ""}
                   required
                 />
+                {errors.supplier && <p className="text-sm text-red-500">{errors.supplier}</p>}
               </div>
             </div>
 
@@ -173,9 +233,11 @@ export function MaterialFormDialog({ open, onOpenChange, onSubmit, initialData }
                 id="lastRestocked"
                 type="date"
                 value={formData.lastRestocked}
-                onChange={(e) => setFormData({ ...formData, lastRestocked: e.target.value })}
+                onChange={(e) => handleInputChange("lastRestocked", e.target.value)}
+                className={errors.lastRestocked ? "border-red-500" : ""}
                 required
               />
+              {errors.lastRestocked && <p className="text-sm text-red-500">{errors.lastRestocked}</p>}
             </div>
           </div>
           <DialogFooter>

@@ -16,12 +16,26 @@ const typeColors = {
 
 export function TransactionsTab() {
   const [transactionsData, setTransactionsData] = useState<any[]>([])
+  const [materialsData, setMaterialsData] = useState<any[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadTransactions()
+    loadMaterials()
   }, [])
+
+  const loadMaterials = async () => {
+    try {
+      const response = await api.materials.list() as any
+      const data = Array.isArray(response) ? response : 
+                   (response as any)?.results || (response as any)?.data || []
+      setMaterialsData(data)
+    } catch (error) {
+      console.error("Error loading materials:", error)
+      setMaterialsData([])
+    }
+  }
 
   const loadTransactions = async () => {
     try {
@@ -42,7 +56,22 @@ export function TransactionsTab() {
 
   const handleAddTransaction = async (data: any) => {
     try {
-      const newTransaction = await api.stockTransactions.create(data)
+      // Find the material ID by name
+      const selectedMaterial = materialsData.find(m => m.name === data.materialName)
+      if (!selectedMaterial) {
+        throw new Error("Please select a valid material")
+      }
+
+      // Convert frontend format to Django API format
+      const apiData = {
+        type: data.type,
+        material: selectedMaterial.id,
+        quantity: data.quantity,
+        reference: data.reference,
+        notes: data.notes,
+      }
+      console.log("Sending transaction data to API:", apiData)
+      const newTransaction = await api.stockTransactions.create(apiData)
       setTransactionsData([newTransaction, ...transactionsData])
     } catch (error) {
       console.error("Error adding transaction:", error)
@@ -121,7 +150,12 @@ export function TransactionsTab() {
         </CardContent>
       </Card>
 
-      <TransactionFormDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} onSubmit={handleAddTransaction} />
+      <TransactionFormDialog 
+        open={isDialogOpen} 
+        onOpenChange={setIsDialogOpen} 
+        onSubmit={handleAddTransaction}
+        materials={materialsData}
+      />
     </div>
   )
 }

@@ -26,13 +26,27 @@ const conditionColors = {
 export function EquipmentTab() {
   const [searchQuery, setSearchQuery] = useState("")
   const [equipmentData, setEquipmentData] = useState<any[]>([])
+  const [projectsData, setProjectsData] = useState<any[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingEquipment, setEditingEquipment] = useState<any>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     loadEquipment()
+    loadProjects()
   }, [])
+
+  const loadProjects = async () => {
+    try {
+      const response = await api.projects.list() as any
+      const data = Array.isArray(response) ? response : 
+                   (response as any)?.results || (response as any)?.data || []
+      setProjectsData(data)
+    } catch (error) {
+      console.error("Error loading projects:", error)
+      setProjectsData([])
+    }
+  }
 
   const loadEquipment = async () => {
     try {
@@ -62,7 +76,25 @@ export function EquipmentTab() {
 
   const handleAddEquipment = async (data: any) => {
     try {
-      const newEquipment = await api.equipment.create(data)
+      // Find the project ID by name (skip if "not-assigned")
+      const selectedProject = data.assignedProject && data.assignedProject !== "not-assigned" ? 
+        projectsData.find(p => p.name === data.assignedProject) : null
+
+      // Convert camelCase to snake_case for Django API
+      const apiData = {
+        name: data.name,
+        category: data.category,
+        status: data.status,
+        condition: data.condition,
+        location: data.location,
+        value: data.value,
+        assigned_to: selectedProject?.id || null,
+        purchase_date: data.purchaseDate,
+        last_maintenance: data.lastMaintenance,
+        next_maintenance: data.nextMaintenance,
+      }
+      console.log("Sending equipment data to API:", apiData)
+      const newEquipment = await api.equipment.create(apiData)
       setEquipmentData([...equipmentData, newEquipment])
     } catch (error) {
       console.error("Error adding equipment:", error)
@@ -72,7 +104,25 @@ export function EquipmentTab() {
 
   const handleEditEquipment = async (data: any) => {
     try {
-      const updatedEquipment = await api.equipment.update(editingEquipment.id, data)
+      // Find the project ID by name (skip if "not-assigned")
+      const selectedProject = data.assignedProject && data.assignedProject !== "not-assigned" ? 
+        projectsData.find(p => p.name === data.assignedProject) : null
+
+      // Convert camelCase to snake_case for Django API
+      const apiData = {
+        name: data.name,
+        category: data.category,
+        status: data.status,
+        condition: data.condition,
+        location: data.location,
+        value: data.value,
+        assigned_to: selectedProject?.id || null,
+        purchase_date: data.purchaseDate,
+        last_maintenance: data.lastMaintenance,
+        next_maintenance: data.nextMaintenance,
+      }
+      console.log("Sending update equipment data to API:", apiData)
+      const updatedEquipment = await api.equipment.update(editingEquipment.id, apiData)
       setEquipmentData(
         equipmentData.map((eq) =>
           eq.id === editingEquipment.id ? updatedEquipment : eq,
@@ -240,6 +290,7 @@ export function EquipmentTab() {
         }}
         onSubmit={editingEquipment ? handleEditEquipment : handleAddEquipment}
         initialData={editingEquipment}
+        projects={projectsData}
       />
     </div>
   )

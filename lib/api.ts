@@ -66,7 +66,14 @@ class ApiClient {
       throw error
     }
 
-    return response.json()
+    // Handle empty responses (like for DELETE operations)
+    const contentType = response.headers.get("content-type")
+    if (contentType && contentType.includes("application/json")) {
+      return response.json()
+    } else {
+      // For empty responses, return an empty object
+      return {} as T
+    }
   }
 
   async get<T>(endpoint: string): Promise<T> {

@@ -21,9 +21,10 @@ interface TransactionFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (data: any) => void
+  materials?: any[]
 }
 
-export function TransactionFormDialog({ open, onOpenChange, onSubmit }: TransactionFormDialogProps) {
+export function TransactionFormDialog({ open, onOpenChange, onSubmit, materials = [] }: TransactionFormDialogProps) {
   const [formData, setFormData] = useState({
     type: "in",
     materialName: "",
@@ -31,18 +32,45 @@ export function TransactionFormDialog({ open, onOpenChange, onSubmit }: Transact
     reference: "",
     notes: "",
   })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+
+    // Required fields validation
+    if (!formData.materialName || formData.materialName === "no-materials") {
+      newErrors.materialName = "Please select a material"
+    }
+    if (!formData.reference.trim()) newErrors.reference = "Reference is required"
+
+    // Numeric validation
+    if (formData.quantity <= 0) newErrors.quantity = "Quantity must be greater than 0"
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit(formData)
-    onOpenChange(false)
-    setFormData({
-      type: "in",
-      materialName: "",
-      quantity: 0,
-      reference: "",
-      notes: "",
-    })
+    if (validateForm()) {
+      onSubmit(formData)
+      onOpenChange(false)
+      setFormData({
+        type: "in",
+        materialName: "",
+        quantity: 0,
+        reference: "",
+        notes: "",
+      })
+    }
+  }
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData({ ...formData, [field]: value })
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors({ ...errors, [field]: "" })
+    }
   }
 
   return (
@@ -69,13 +97,26 @@ export function TransactionFormDialog({ open, onOpenChange, onSubmit }: Transact
 
             <div className="space-y-2">
               <Label htmlFor="materialName">Material *</Label>
-              <Input
-                id="materialName"
+              <Select
                 value={formData.materialName}
-                onChange={(e) => setFormData({ ...formData, materialName: e.target.value })}
-                placeholder="Material name"
-                required
-              />
+                onValueChange={(value) => handleInputChange("materialName", value)}
+              >
+                <SelectTrigger className={errors.materialName ? "border-red-500" : ""}>
+                  <SelectValue placeholder="Select material" />
+                </SelectTrigger>
+                <SelectContent>
+                  {materials.length === 0 ? (
+                    <SelectItem value="no-materials" disabled>No materials available</SelectItem>
+                  ) : (
+                    materials.map((material) => (
+                      <SelectItem key={material.id} value={material.name}>
+                        {material.name} ({material.category})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {errors.materialName && <p className="text-sm text-red-500">{errors.materialName}</p>}
             </div>
 
             <div className="space-y-2">
@@ -84,9 +125,11 @@ export function TransactionFormDialog({ open, onOpenChange, onSubmit }: Transact
                 id="quantity"
                 type="number"
                 value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: Number(e.target.value) })}
+                onChange={(e) => handleInputChange("quantity", Number(e.target.value))}
+                className={errors.quantity ? "border-red-500" : ""}
                 required
               />
+              {errors.quantity && <p className="text-sm text-red-500">{errors.quantity}</p>}
             </div>
 
             <div className="space-y-2">
@@ -94,10 +137,12 @@ export function TransactionFormDialog({ open, onOpenChange, onSubmit }: Transact
               <Input
                 id="reference"
                 value={formData.reference}
-                onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
+                onChange={(e) => handleInputChange("reference", e.target.value)}
                 placeholder="e.g., PO-2024-001, Project-Villa-A"
+                className={errors.reference ? "border-red-500" : ""}
                 required
               />
+              {errors.reference && <p className="text-sm text-red-500">{errors.reference}</p>}
             </div>
 
             <div className="space-y-2">
