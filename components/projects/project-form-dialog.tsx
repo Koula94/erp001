@@ -3,6 +3,8 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Dialog,
   DialogContent,
@@ -17,6 +19,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { api } from "@/lib/api"
+import { projectFormSchema, type ProjectFormInput } from "@/lib/validation"
+import { useToast } from "@/hooks/use-toast"
 
 interface ProjectFormDialogProps {
   open: boolean
@@ -37,20 +41,61 @@ interface Employee {
 }
 
 export function ProjectFormDialog({ open, onOpenChange, onSubmit, project }: ProjectFormDialogProps) {
-  const [formData, setFormData] = useState({
-    name: project?.name || "",
-    client: project?.client || "",
-    description: project?.description || "",
-    status: project?.status || "planning",
-    start_date: project?.start_date || "",
-    end_date: project?.end_date || "",
-    budget: project?.budget || "",
-    manager: project?.manager || "",
-    team: project?.team || [],
-  })
   const [clients, setClients] = useState<Client[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(false)
+  const { toast } = useToast()
+
+  const {
+    register,
+    handleSubmit: hookFormSubmit,
+    formState: { errors, isSubmitting },
+    reset,
+    setValue,
+    watch
+  } = useForm<ProjectFormInput>({
+    resolver: zodResolver(projectFormSchema),
+    defaultValues: {
+      name: project?.name || "",
+      client: project?.client?.toString() || "",
+      description: project?.description || "",
+      status: project?.status || "planning",
+      start_date: project?.start_date || "",
+      end_date: project?.end_date || "",
+      budget: project?.budget?.toString() || "",
+      manager: project?.manager?.toString() || "",
+      team: project?.team?.map(t => t.toString()) || [],
+    }
+  })
+
+  // Reset form when project changes
+  useEffect(() => {
+    if (project) {
+      reset({
+        name: project.name || "",
+        client: project.client?.toString() || "",
+        description: project.description || "",
+        status: project.status || "planning",
+        start_date: project.start_date || "",
+        end_date: project.end_date || "",
+        budget: project.budget?.toString() || "",
+        manager: project.manager?.toString() || "",
+        team: project.team?.map(t => t.toString()) || [],
+      })
+    } else {
+      reset({
+        name: "",
+        client: "",
+        description: "",
+        status: "planning",
+        start_date: "",
+        end_date: "",
+        budget: "",
+        manager: "",
+        team: [],
+      })
+    }
+  }, [project, reset])
 
   useEffect(() => {
     if (open) {
@@ -79,52 +124,61 @@ export function ProjectFormDialog({ open, onOpenChange, onSubmit, project }: Pro
       setEmployees(employeesData as Employee[])
     } catch (error) {
       console.error("Failed to load data:", error)
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de charger les données",
+      })
     } finally {
       setLoading(false)
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSubmit({
-      ...project,
-      ...formData,
-      budget: Number(formData.budget),
-      progress: project?.progress || 0,
-      spent: project?.spent || 0,
-    })
-    onOpenChange(false)
+  const handleFormSubmit = async (data: ProjectFormInput) => {
+    try {
+      await onSubmit({
+        ...project,
+        ...data,
+        progress: project?.progress || 0,
+        spent: project?.spent || 0,
+      })
+      onOpenChange(false)
+    } catch (error) {
+      console.error("Failed to submit project:", error)
+    }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{project ? "Edit Project" : "New Project"}</DialogTitle>
+          <DialogTitle>{project ? "Modifier le projet" : "Nouveau projet"}</DialogTitle>
           <DialogDescription>
-            {project ? "Update project information" : "Create a new project for your client"}
+            {project ? "Mettre à jour les informations du projet" : "Créer un nouveau projet pour votre client"}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={hookFormSubmit(handleFormSubmit)} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="name">Project Name *</Label>
+              <Label htmlFor="name">Nom du projet *</Label>
               <Input
                 id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
+                {...register("name")}
+                placeholder="Nom du projet"
               />
+              {errors.name && (
+                <p className="text-sm text-red-600">{errors.name.message}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="client">Client *</Label>
               <Select
-                value={formData.client}
-                onValueChange={(value) => setFormData({ ...formData, client: value })}
+                onValueChange={(value) => setValue("client", value)}
+                defaultValue={watch("client")}
                 disabled={loading}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={loading ? "Loading clients..." : "Select client"} />
+                  <SelectValue placeholder={loading ? "Chargement des clients..." : "Sélectionner un client"} />
                 </SelectTrigger>
                 <SelectContent>
                   {clients.map((client) => (
@@ -134,6 +188,9 @@ export function ProjectFormDialog({ open, onOpenChange, onSubmit, project }: Pro
                   ))}
                 </SelectContent>
               </Select>
+              {errors.client && (
+                <p className="text-sm text-red-600">{errors.client.message}</p>
+              )}
             </div>
           </div>
 
@@ -141,36 +198,45 @@ export function ProjectFormDialog({ open, onOpenChange, onSubmit, project }: Pro
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              {...register("description")}
+              placeholder="Description du projet"
               rows={3}
             />
+            {errors.description && (
+              <p className="text-sm text-red-600">{errors.description.message}</p>
+            )}
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
-              <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+              <Label htmlFor="status">Statut</Label>
+              <Select
+                onValueChange={(value) => setValue("status", value as any)}
+                defaultValue={watch("status")}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="planning">Planning</SelectItem>
-                  <SelectItem value="in-progress">In Progress</SelectItem>
-                  <SelectItem value="on-hold">On Hold</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="planning">Planification</SelectItem>
+                  <SelectItem value="in-progress">En cours</SelectItem>
+                  <SelectItem value="on-hold">En attente</SelectItem>
+                  <SelectItem value="completed">Terminé</SelectItem>
                 </SelectContent>
               </Select>
+              {errors.status && (
+                <p className="text-sm text-red-600">{errors.status.message}</p>
+              )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="manager">Project Manager *</Label>
-              <Select 
-                value={formData.manager} 
-                onValueChange={(value) => setFormData({ ...formData, manager: value })}
+              <Label htmlFor="manager">Chef de projet *</Label>
+              <Select
+                onValueChange={(value) => setValue("manager", value)}
+                defaultValue={watch("manager")}
                 disabled={loading}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={loading ? "Loading managers..." : "Select manager"} />
+                  <SelectValue placeholder={loading ? "Chargement des managers..." : "Sélectionner un manager"} />
                 </SelectTrigger>
                 <SelectContent>
                   {employees
@@ -182,29 +248,34 @@ export function ProjectFormDialog({ open, onOpenChange, onSubmit, project }: Pro
                     ))}
                 </SelectContent>
               </Select>
+              {errors.manager && (
+                <p className="text-sm text-red-600">{errors.manager.message}</p>
+              )}
             </div>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="start_date">Start Date *</Label>
+              <Label htmlFor="start_date">Date de début *</Label>
               <Input
                 id="start_date"
                 type="date"
-                value={formData.start_date}
-                onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
-                required
+                {...register("start_date")}
               />
+              {errors.start_date && (
+                <p className="text-sm text-red-600">{errors.start_date.message}</p>
+              )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="end_date">End Date *</Label>
+              <Label htmlFor="end_date">Date de fin *</Label>
               <Input
                 id="end_date"
                 type="date"
-                value={formData.end_date}
-                onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
-                required
+                {...register("end_date")}
               />
+              {errors.end_date && (
+                <p className="text-sm text-red-600">{errors.end_date.message}</p>
+              )}
             </div>
           </div>
 
@@ -213,17 +284,21 @@ export function ProjectFormDialog({ open, onOpenChange, onSubmit, project }: Pro
             <Input
               id="budget"
               type="number"
-              value={formData.budget}
-              onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
-              required
+              {...register("budget")}
+              placeholder="0.00"
             />
+            {errors.budget && (
+              <p className="text-sm text-red-600">{errors.budget.message}</p>
+            )}
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              Annuler
             </Button>
-            <Button type="submit">{project ? "Update Project" : "Create Project"}</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Enregistrement..." : (project ? "Mettre à jour" : "Créer le projet")}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

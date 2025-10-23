@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog"
 import { QuoteFormDialog } from "./quote-form-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Pagination, usePagination } from "@/components/ui/pagination"
 
 const statusColors = {
   pending: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
@@ -54,6 +55,8 @@ export function QuotesTab() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 10 // Number of items per page
 
   useEffect(() => {
     loadQuotes()
@@ -81,6 +84,17 @@ export function QuotesTab() {
       quote.client_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       quote.project_name.toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  // Apply pagination to filtered quotes
+  const { paginatedData, totalPages, totalItems } = usePagination(
+    filteredQuotes,
+    currentPage,
+    pageSize
+  )
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   const handleSaveQuote = async (quote: any) => {
     try {
@@ -237,7 +251,7 @@ export function QuotesTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredQuotes.map((quote) => (
+                {paginatedData.map((quote) => (
                   <TableRow key={quote.id}>
                     <TableCell className="font-medium">{quote.id}</TableCell>
                     <TableCell>{quote.client_name}</TableCell>
@@ -349,6 +363,19 @@ export function QuotesTab() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          
+          {/* Pagination */}
+          {filteredQuotes.length > pageSize && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                pageSize={pageSize}
+                totalItems={totalItems}
+              />
+            </div>
           )}
         </CardContent>
       </Card>

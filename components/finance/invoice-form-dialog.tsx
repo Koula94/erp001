@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import {
   Dialog,
   DialogContent,
@@ -17,6 +17,26 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Plus, X } from "lucide-react"
+import { api } from "@/lib/api"
+
+interface Client {
+  id: string
+  name: string
+  email?: string
+  phone?: string
+}
+
+interface Project {
+  id: string
+  name: string
+  client_name?: string
+}
+
+interface InvoiceItem {
+  description: string
+  quantity: number
+  unit_price: number
+}
 
 interface InvoiceFormDialogProps {
   open: boolean
@@ -28,25 +48,141 @@ interface InvoiceFormDialogProps {
 export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }: InvoiceFormDialogProps) {
   const [formData, setFormData] = useState(
     initialData || {
+      clientId: "",
       clientName: "",
+      projectId: "",
       projectName: "",
       status: "draft",
       dueDate: "",
-      items: [{ description: "", quantity: 1, unitPrice: 0 }],
+      items: [{ description: "", quantity: 1, unit_price: 0 }],
+      amount: 0, // ensure amount exists to avoid undefined/NaN
       notes: "",
     },
   )
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSubmit(formData)
-    onOpenChange(false)
+  // Update form data when initialData changes (for editing)
+  useEffect(() => {
+    if (initialData) {
+      // normalize numeric fields from initialData to avoid NaN issues
+      const items = (initialData.items || []).map((it: any) => ({
+        ...it,
+        quantity: Number(it.quantity) || 0,
+        unit_price: Number(it.unit_price) || 0,
+      }))
+      setFormData({
+        ...initialData,
+        amount: Number(initialData.amount) || items.reduce((s: number, it: any) => s + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0), 0),
+        items,
+      })
+    } else {
+      // Reset form when creating new invoice
+      setFormData({
+        clientId: "",
+        clientName: "",
+        projectId: "",
+        projectName: "",
+        status: "draft",
+        dueDate: "",
+        items: [{ description: "", quantity: 1, unit_price: 0 }],
+        amount: 0,
+        notes: "",
+      })
+    }
+  }, [initialData, open])
+  const [clients, setClients] = useState<Client[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    if (open) {
+      loadClients()
+      loadProjects()
+    }
+  }, [open])
+
+  const loadClients = async () => {
+    try {
+      setLoading(true)
+      const response = await api.clients.list() as any
+      const data = Array.isArray(response) ? response : response.results || response.data || []
+      setClients(data as Client[])
+    } catch (err) {
+      console.error("Error loading clients:", err)
+    } finally {
+      setLoading(false)
+    }
   }
+
+  const loadProjects = async () => {
+    try {
+      const response = await api.projects.list() as any
+      const data = Array.isArray(response) ? response : response.results || response.data || []
+      setProjects(data as Project[])
+    } catch (err) {
+      console.error("Error loading projects:", err)
+    }
+  }
+
+  // Compute total amount from items whenever items change
+  useEffect(() => {
+    const items = formData.items || []
+    const total = items.reduce((sum: number, it: any) => {
+      const qty = Number(it.quantity) || 0
+      const price = Number(it.unit_price) || 0
+      return sum + qty * price
+    }, 0)
+    // Only update amount if different to avoid unnecessary renders
+    if (formData.amount !== total) {
+      setFormData((prev: any) => ({ ...prev, amount: total }))
+    }
+  }, [formData.items])
+
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault()
+
+      // Recalculate amount from items to be sure
+      const items = formData.items || []
+      const amount = items.reduce((sum: number, it: any) => {
+        const qty = Number(it.quantity) || 0
+        const price = Number(it.unit_price)
+        return sum + qty * (isNaN(price) ? 0 : price)
+      }, 0)
+
+      // Validation: amount must be a valid number > 0
+      if (isNaN(amount) || amount <= 0) {
+        setError("Le montant est requis et doit être un nombre valide")
+        return
+      }
+
+      // Validation: every item must have a numeric unit_price
+      if (!items.length || items.some((item: any) => item.unit_price === "" || item.unit_price === null || item.unit_price === undefined || isNaN(Number(item.unit_price)))) {
+        setError("Le prix unitaire est requis pour tous les articles")
+        return
+      }
+
+      // Get the selected client and project names
+      const selectedClient = clients.find(client => client.id === formData.clientId)
+      const selectedProject = projects.find(project => project.id === formData.projectId)
+      const invoiceData = {
+        ...formData,
+        amount,
+        clientName: selectedClient?.name || formData.clientName,
+        projectName: selectedProject?.name || formData.projectName,
+        items: items.map((it: any) => ({ ...it, quantity: Number(it.quantity) || 0, unit_price: Number(it.unit_price) || 0 })),
+      }
+
+      onSubmit(invoiceData)
+      onOpenChange(false)
+    },
+    [formData, onSubmit, clients, projects, onOpenChange]
+  )
 
   const addItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { description: "", quantity: 1, unitPrice: 0 }],
+      items: [...formData.items, { description: "", quantity: 1, unit_price: 0 }],
     })
   }
 
@@ -59,8 +195,12 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
 
   const updateItem = (index: number, field: string, value: any) => {
     const newItems = [...formData.items]
-    newItems[index] = { ...newItems[index], [field]: value }
-    setFormData({ ...formData, items: newItems })
+    // coerce numeric fields to numbers to avoid string/NaN issues
+    const normalizedValue =
+      field === "quantity" || field === "unit_price" ? (value === "" ? 0 : Number(value)) : value
+    newItems[index] = { ...newItems[index], [field]: normalizedValue }
+    setFormData({ ...formData, items: newItems, amount: undefined }) // amount will be recalculated by effect
+    setError("") // clear previous error when user edits items
   }
 
   return (
@@ -76,22 +216,41 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="clientName">Client Name *</Label>
-                <Input
-                  id="clientName"
-                  value={formData.clientName}
-                  onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
-                  required
-                />
+                <Label htmlFor="client">Client *</Label>
+                <Select
+                  value={formData.clientId}
+                  onValueChange={(value) => setFormData({ ...formData, clientId: value })}
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={loading ? "Loading clients..." : "Select a client"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="projectName">Project Name *</Label>
-                <Input
-                  id="projectName"
-                  value={formData.projectName}
-                  onChange={(e) => setFormData({ ...formData, projectName: e.target.value })}
-                  required
-                />
+                <Label htmlFor="project">Project *</Label>
+                <Select
+                  value={formData.projectId}
+                  onValueChange={(value) => setFormData({ ...formData, projectId: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -122,6 +281,19 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
               </div>
             </div>
 
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="amount">Montant (calculé)</Label>
+                <Input
+                  id="amount"
+                  type="text"
+                  value={typeof formData.amount === "number" ? formData.amount.toFixed(2) : "0.00"}
+                  readOnly
+                />
+                <p className="text-sm text-muted-foreground">Le montant est calculé à partir des lignes (quantité × prix unitaire). Modifiez les lignes pour changer le montant.</p>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Invoice Items *</Label>
@@ -136,14 +308,14 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
                     <div className="flex-1 grid grid-cols-3 gap-2">
                       <Input
                         placeholder="Description"
-                        value={item.description}
+                        value={item.description || ""}
                         onChange={(e) => updateItem(index, "description", e.target.value)}
                         required
                       />
                       <Input
                         type="number"
                         placeholder="Quantity"
-                        value={item.quantity}
+                        value={item.quantity || 1}
                         onChange={(e) => updateItem(index, "quantity", Number(e.target.value))}
                         required
                       />
@@ -151,8 +323,8 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
                         type="number"
                         step="0.01"
                         placeholder="Unit Price"
-                        value={item.unitPrice}
-                        onChange={(e) => updateItem(index, "unitPrice", Number(e.target.value))}
+                        value={item.unit_price || 0}
+                        onChange={(e) => updateItem(index, "unit_price", Number(e.target.value))}
                         required
                       />
                     </div>
@@ -176,6 +348,12 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
                 rows={3}
               />
             </div>
+
+            {error && (
+              <div className="text-red-500 text-sm mt-2">
+                {error}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

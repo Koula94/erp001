@@ -2,8 +2,8 @@ from rest_framework import serializers
 from .models import Client, Quote, QuoteItem, Communication
 
 class ClientSerializer(serializers.ModelSerializer):
-    total_projects = serializers.IntegerField(read_only=True, default=0)
-    total_revenue = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True, default=0)
+    total_projects = serializers.ReadOnlyField()
+    total_revenue = serializers.ReadOnlyField()
     
     class Meta:
         model = Client

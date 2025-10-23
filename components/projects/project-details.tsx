@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils"
 import { TaskFormDialog } from "./task-form-dialog"
 import { MilestoneFormDialog } from "./milestone-form-dialog"
 import { GanttChart } from "./gantt-chart"
+import { ProjectRisksCard } from "./project-risks-card"
+import { generateProjectNotifications } from "@/lib/project-logic"
 
 const statusColors = {
   "in-progress": "bg-blue-500/10 text-blue-700 dark:text-blue-400",
@@ -93,11 +95,17 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
   const loadProjectData = async () => {
     try {
       setLoading(true)
+      console.log("Loading project data for ID:", projectId)
+      
       const [projectData, tasksResponse, milestonesResponse] = await Promise.all([
         api.projects.get(projectId) as Promise<Project>,
-        api.tasks.list(),
-        api.milestones.list()
+        api.tasks.list(`?project=${projectId}`),
+        api.milestones.list(`?project=${projectId}`)
       ])
+      
+      console.log("Project data:", projectData)
+      console.log("Tasks response:", tasksResponse)
+      console.log("Milestones response:", milestonesResponse)
       
       // Handle different response formats safely
       const tasksData = (Array.isArray(tasksResponse) ? tasksResponse : 
@@ -108,9 +116,19 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
                             (milestonesResponse && typeof milestonesResponse === 'object' && 'results' in milestonesResponse ? 
                              (milestonesResponse as any).results : [])) as Milestone[]
       
+      console.log("Processed tasks:", tasksData)
+      console.log("Processed milestones:", milestonesData)
+      
+      // Filter tasks and milestones by project ID to ensure only this project's data is shown
+      const filteredTasks = tasksData.filter(task => task.project === projectId)
+      const filteredMilestones = milestonesData.filter(milestone => milestone.project === projectId)
+      
+      console.log("Filtered tasks:", filteredTasks)
+      console.log("Filtered milestones:", filteredMilestones)
+      
       setProject(projectData)
-      setTasks(tasksData.filter((task: Task) => task.project === projectId))
-      setMilestones(milestonesData.filter((milestone: Milestone) => milestone.project === projectId))
+      setTasks(filteredTasks)
+      setMilestones(filteredMilestones)
     } catch (error) {
       console.error("Failed to load project data:", error)
     } finally {
@@ -142,7 +160,12 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
     if (confirm("Are you sure you want to delete this task?")) {
       try {
         await api.tasks.delete(taskId)
-        setTasks(tasks.filter((t) => t.id !== taskId))
+        const updatedTasks = tasks.filter((t) => t.id !== taskId)
+        setTasks(updatedTasks)
+        
+        // Recharger le projet pour obtenir la progression mise à jour automatiquement par le backend
+        const updatedProject = await api.projects.get(projectId) as Project
+        setProject(updatedProject)
       } catch (error) {
         console.error("Failed to delete task:", error)
         alert("Failed to delete task")
@@ -154,11 +177,18 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
     try {
       if (editingTask) {
         const updatedTask = await api.tasks.update(editingTask.id, taskData) as Task
-        setTasks(tasks.map((t) => (t.id === editingTask.id ? updatedTask : t)))
+        const updatedTasks = tasks.map((t) => (t.id === editingTask.id ? updatedTask : t))
+        setTasks(updatedTasks)
       } else {
         const newTask = await api.tasks.create({ ...taskData, project: projectId }) as Task
-        setTasks([...tasks, newTask])
+        const updatedTasks = [...tasks, newTask]
+        setTasks(updatedTasks)
       }
+      
+      // Recharger le projet pour obtenir la progression mise à jour automatiquement par le backend
+      const updatedProject = await api.projects.get(projectId) as Project
+      setProject(updatedProject)
+      
       setTaskDialogOpen(false)
     } catch (error: any) {
       console.error("Failed to save task:", error)
@@ -266,6 +296,11 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Carte d'évaluation des risques */}
+      {project && tasks.length > 0 && (
+        <ProjectRisksCard project={project} tasks={tasks} />
+      )}
 
       <Tabs defaultValue="tasks" className="w-full">
         <TabsList>

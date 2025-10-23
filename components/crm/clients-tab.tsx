@@ -27,6 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Pagination, usePagination } from "@/components/ui/pagination"
 
 const statusColors = {
   active: "bg-green-500/10 text-green-700 dark:text-green-400",
@@ -57,6 +58,8 @@ export function ClientsTab() {
   const [deletingClientId, setDeletingClientId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 10 // Number of items per page
 
   useEffect(() => {
     loadClients()
@@ -70,8 +73,12 @@ export function ClientsTab() {
       const data = Array.isArray(response) ? response : response.results || response.data || []
       setClients(data as Client[])
       setError(null)
-    } catch (err) {
-      setError("Failed to load clients")
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.detail || 
+                          err?.response?.data?.message || 
+                          err?.message || 
+                          "Failed to load clients. Please check your connection and try again."
+      setError(errorMessage)
       console.error("Error loading clients:", err)
     } finally {
       setLoading(false)
@@ -83,6 +90,17 @@ export function ClientsTab() {
       client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.email.toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  // Apply pagination to filtered clients
+  const { paginatedData, totalPages, totalItems } = usePagination(
+    filteredClients,
+    currentPage,
+    pageSize
+  )
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   const handleSaveClient = async (clientData: any) => {
     try {
@@ -110,8 +128,12 @@ export function ClientsTab() {
         setClients([...clients, newClient])
       }
       setEditingClient(null)
-    } catch (err) {
-      setError("Failed to save client")
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.detail || 
+                          err?.response?.data?.message || 
+                          err?.message || 
+                          "Failed to save client. Please check the data and try again."
+      setError(errorMessage)
       console.error("Error saving client:", err)
     }
   }
@@ -126,8 +148,12 @@ export function ClientsTab() {
       await api.clients.delete(clientId)
       setClients(clients.filter((c) => c.id !== clientId))
       setDeletingClientId(null)
-    } catch (err) {
-      setError("Failed to delete client")
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.detail || 
+                          err?.response?.data?.message || 
+                          err?.message || 
+                          "Failed to delete client. The client may be referenced by other records."
+      setError(errorMessage)
       console.error("Error deleting client:", err)
     }
   }
@@ -189,7 +215,7 @@ export function ClientsTab() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredClients.map((client) => (
+                {paginatedData.map((client) => (
                   <TableRow key={client.id}>
                     <TableCell className="font-medium">{client.name}</TableCell>
                     <TableCell>{client.contact_person}</TableCell>
@@ -285,6 +311,19 @@ export function ClientsTab() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          
+          {/* Pagination */}
+          {filteredClients.length > pageSize && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                pageSize={pageSize}
+                totalItems={totalItems}
+              />
+            </div>
           )}
         </CardContent>
       </Card>

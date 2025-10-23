@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Count, Q
 from users.models import User
 from crm.models import Client
 
@@ -25,6 +26,243 @@ class Project(models.Model):
     
     def __str__(self):
         return self.name
+    
+    def calculate_progress_from_tasks(self):
+        """Calcule la progression automatique basée sur les tâches"""
+        tasks = self.tasks.all()
+        
+        if not tasks.exists():
+            return 0
+        
+        # Calcul simple basé sur le nombre de tâches
+        total_tasks = tasks.count()
+        completed_tasks = tasks.filter(status='completed').count()
+        in_progress_tasks = tasks.filter(status='in-progress').count()
+        
+        # Progression simple : tâches terminées = 100%, en cours = 50%, en attente = 0%
+        simple_progress = ((completed_tasks * 100) + (in_progress_tasks * 50)) / total_tasks
+        
+        # Calcul pondéré basé sur la priorité des tâches
+        priority_weights = {
+            'high': 3,
+            'medium': 2,
+            'low': 1
+        }
+        
+        total_weight = 0
+        completed_weight = 0
+        
+        for task in tasks:
+            weight = priority_weights.get(task.priority, 1)
+            total_weight += weight
+            
+            if task.status == 'completed':
+                completed_weight += weight
+            elif task.status == 'in-progress':
+                completed_weight += weight * 0.5
+        
+        weighted_progress = (completed_weight / total_weight) * 100 if total_weight > 0 else 0
+        
+        # Utiliser la progression pondérée si elle est significativement différente
+        if abs(simple_progress - weighted_progress) > 10:
+            return round(weighted_progress)
+        else:
+            return round(simple_progress)
+    
+    def get_auto_status(self, progress):
+        """Détermine automatiquement le statut basé sur la progression avec règles de cohérence"""
+        # Règles de cohérence progression/statut
+        if progress == 100:
+            return 'completed'
+        elif progress >= 90:
+            # Si progression >= 90%, forcer le statut "completed" pour éviter les incohérences
+            return 'completed'
+        elif progress >= 10:
+            return 'in-progress'
+        else:
+            return 'planning'
+    
+    def validate_status_progress_consistency(self):
+        """Valide la cohérence entre le statut et la progression actuelle"""
+        status_rules = {
+            'planning': {'min': 0, 'max': 10},
+            'in-progress': {'min': 10, 'max': 90},
+            'completed': {'min': 90, 'max': 100},
+            'on-hold': {'min': 0, 'max': 100}  # Statut spécial sans restriction
+        }
+        
+        rule = status_rules.get(self.status, {'min': 0, 'max': 100})
+        return rule['min'] <= self.progress <= rule['max']
+    
+    def sync_with_tasks(self):
+        """Synchronise automatiquement le projet avec ses tâches et corrige les incohérences"""
+        real_progress = self.calculate_progress_from_tasks()
+        auto_status = self.get_auto_status(real_progress)
+        
+        # Vérifier si le statut actuel est cohérent avec la progression
+        is_current_status_consistent = self.validate_status_progress_consistency()
+        
+        # Mettre à jour la progression si nécessaire
+        progress_changed = self.progress != real_progress
+        if progress_changed:
+            self.progress = real_progress
+        
+        # Déterminer si le statut doit être mis à jour
+        status_changed = False
+        
+        # Si le statut actuel est incohérent, forcer la correction
+        if not is_current_status_consistent:
+            self.status = auto_status
+            status_changed = True
+        # Sinon, appliquer les transitions normales
+        elif self.status != auto_status:
+            # Vérifier les transitions autorisées
+            allowed_transitions = {
+                'planning': ['in-progress', 'on-hold'],
+                'in-progress': ['completed', 'on-hold'],
+                'on-hold': ['in-progress', 'planning'],
+                'completed': []
+            }
+            
+            if auto_status in allowed_transitions.get(self.status, []):
+                self.status = auto_status
+                status_changed = True
+        
+        return {
+            'progress_changed': progress_changed,
+            'status_changed': status_changed,
+            'new_progress': real_progress,
+            'new_status': auto_status,
+            'was_inconsistent': not is_current_status_consistent
+        }
+    
+    def get_critical_tasks(self):
+        """Retourne les tâches critiques du projet"""
+        from django.utils import timezone
+        
+        today = timezone.now().date()
+        critical_tasks = []
+        
+        for task in self.tasks.all():
+            is_critical = (
+                (task.priority == 'high' and task.status != 'completed') or
+                (task.end_date and task.end_date < today and task.status != 'completed') or
+                (task.status == 'in-progress' and task.progress == 0)
+            )
+            
+            if is_critical:
+                critical_tasks.append(task)
+        
+        return critical_tasks
+    
+    def get_risk_level(self):
+        """Évalue le niveau de risque du projet"""
+        critical_tasks = self.get_critical_tasks()
+        total_tasks = self.tasks.count()
+        
+        if total_tasks == 0:
+            return 'low'
+        
+        critical_percentage = (len(critical_tasks) / total_tasks) * 100
+        
+        if critical_percentage > 30 or len(critical_tasks) >= 3:
+            return 'high'
+        elif critical_percentage > 10 or len(critical_tasks) >= 1:
+            return 'medium'
+        else:
+            return 'low'
+    
+    def calculate_spent_from_finance(self):
+        """Calcule automatiquement le montant dépensé basé sur les données finance"""
+        try:
+            from finance.models import Expense, Invoice
+            
+            # Somme des dépenses approuvées liées au projet
+            approved_expenses = Expense.objects.filter(
+                project=self, 
+                status='approved'
+            ).aggregate(total=models.Sum('amount'))['total'] or 0
+            
+            # Somme des factures payées liées au projet
+            paid_invoices = Invoice.objects.filter(
+                project=self,
+                status='paid'
+            ).aggregate(total=models.Sum('amount'))['total'] or 0
+            
+            # Total dépensé = dépenses approuvées + factures payées
+            total_spent = approved_expenses + paid_invoices
+            
+            return total_spent
+            
+        except Exception as e:
+            print(f"Erreur lors du calcul des dépenses: {e}")
+            return self.spent  # Retourner la valeur actuelle en cas d'erreur
+    
+    def sync_with_finance(self):
+        """Synchronise automatiquement le budget du projet avec les données finance"""
+        real_spent = self.calculate_spent_from_finance()
+        budget_used = (real_spent / self.budget) * 100 if self.budget > 0 else 0
+        
+        # Mettre à jour si nécessaire
+        spent_changed = self.spent != real_spent
+        if spent_changed:
+            self.spent = real_spent
+        
+        return {
+            'spent_changed': spent_changed,
+            'new_spent': real_spent,
+            'budget_used_percentage': budget_used,
+            'budget_status': self.get_budget_status()
+        }
+    
+    def get_budget_status(self):
+        """Retourne le statut du budget"""
+        if self.budget == 0:
+            return 'no-budget'
+        
+        budget_used = (self.spent / self.budget) * 100
+        
+        if budget_used <= 80:
+            return 'under-budget'
+        elif budget_used <= 100:
+            return 'on-budget'
+        else:
+            return 'over-budget'
+    
+    def get_budget_risk_level(self):
+        """Évalue le niveau de risque budgétaire"""
+        budget_status = self.get_budget_status()
+        
+        if budget_status == 'over-budget':
+            return 'high'
+        elif budget_status == 'on-budget':
+            return 'medium'
+        else:
+            return 'low'
+    
+    def get_overall_risk_level(self):
+        """Évalue le niveau de risque global (tâches + budget)"""
+        task_risk = self.get_risk_level()
+        budget_risk = self.get_budget_risk_level()
+        
+        # Priorité au risque le plus élevé
+        risk_weights = {
+            'high': 3,
+            'medium': 2,
+            'low': 1
+        }
+        
+        task_weight = risk_weights.get(task_risk, 1)
+        budget_weight = risk_weights.get(budget_risk, 1)
+        
+        max_weight = max(task_weight, budget_weight)
+        
+        if max_weight == 3:
+            return 'high'
+        elif max_weight == 2:
+            return 'medium'
+        else:
+            return 'low'
 
 class Task(models.Model):
     STATUS_CHOICES = [

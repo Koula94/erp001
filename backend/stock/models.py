@@ -52,6 +52,12 @@ class Material(models.Model):
         
         self.save()
     
+    def save(self, *args, **kwargs):
+        """Override save to automatically calculate status"""
+        # Calculate status before saving
+        self.status = self.calculate_status()
+        super().save(*args, **kwargs)
+    
     def __str__(self):
         return self.name
 

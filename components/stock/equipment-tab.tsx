@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Search, Wrench, Calendar } from "lucide-react"
+import { Plus, Search, Wrench, Calendar, Edit, Trash2, Filter } from "lucide-react"
 import { api } from "@/lib/api"
 import { EquipmentFormDialog } from "./equipment-form-dialog"
 
@@ -30,6 +30,9 @@ export function EquipmentTab() {
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingEquipment, setEditingEquipment] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [categoryFilter, setCategoryFilter] = useState("")
+  const [statusFilter, setStatusFilter] = useState("")
+  const [conditionFilter, setConditionFilter] = useState("")
 
   useEffect(() => {
     loadEquipment()
@@ -56,6 +59,7 @@ export function EquipmentTab() {
       // Handle different response formats
       const data = Array.isArray(response) ? response : 
                    (response as any)?.results || (response as any)?.data || []
+      console.log("Equipment data structure:", data)
       setEquipmentData(data)
     } catch (error) {
       console.error("Error loading equipment:", error)
@@ -65,13 +69,41 @@ export function EquipmentTab() {
     }
   }
 
-  const filteredEquipment = equipmentData.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.category.toLowerCase().includes(searchQuery.toLowerCase()),
-  )
+  // Get unique categories, statuses, and conditions for filters
+  const categories = Array.from(new Set(equipmentData
+    .map(eq => eq.category)
+    .filter(category => category && category.trim() !== "")
+  )).sort()
+  const statuses = Array.from(new Set(equipmentData
+    .map(eq => eq.status)
+    .filter(status => status && status.trim() !== "")
+  )).sort()
+  const conditions = Array.from(new Set(equipmentData
+    .map(eq => eq.condition)
+    .filter(condition => condition && condition.trim() !== "")
+  )).sort()
 
-  const totalValue = equipmentData.reduce((sum, eq) => sum + (eq.value || 0), 0)
+  console.log("Categories for filter:", categories)
+  console.log("Statuses for filter:", statuses)
+  console.log("Conditions for filter:", conditions)
+  
+  // Filter equipment
+  const filteredEquipment = equipmentData.filter((item) => {
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         item.category.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesCategory = !categoryFilter || item.category === categoryFilter
+    const matchesStatus = !statusFilter || item.status === statusFilter
+    const matchesCondition = !conditionFilter || item.condition === conditionFilter
+    
+    return matchesSearch && matchesCategory && matchesStatus && matchesCondition
+  })
+
+  const totalValue = equipmentData.reduce((sum, eq) => {
+    // Try different possible field names for value
+    const value = eq.value || eq.unit_price || eq.price || eq.cost || 0
+    console.log(`Equipment ${eq.name}: value=${value}`)
+    return sum + Number(value)
+  }, 0)
   const availableCount = equipmentData.filter((eq) => eq.status === "available").length
 
   const handleAddEquipment = async (data: any) => {
@@ -151,16 +183,23 @@ export function EquipmentTab() {
     setIsDialogOpen(true)
   }
 
+  const clearFilters = () => {
+    setCategoryFilter("")
+    setStatusFilter("")
+    setConditionFilter("")
+    setSearchQuery("")
+  }
+
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Equipment Value</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Equipment Value (GNF)</CardTitle>
             <Wrench className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalValue.toLocaleString()}</div>
+            <div className="text-2xl font-bold">{totalValue.toLocaleString()} GNF</div>
             <p className="text-xs text-muted-foreground mt-1">{equipmentData.length} equipment items</p>
           </CardContent>
         </Card>
@@ -188,20 +227,77 @@ export function EquipmentTab() {
         </Card>
       </div>
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search equipment..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8"
-          />
+      <div className="flex flex-col gap-4">
+        {/* Search and Filters */}
+        <div className="flex flex-col md:flex-row gap-4 items-start md:items-center">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search equipment..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-3 py-2 border rounded-md text-sm bg-background"
+            >
+              <option value="">All Categories</option>
+              {categories.map(category => (
+                <option key={category} value={category}>{category}</option>
+              ))}
+            </select>
+            
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 border rounded-md text-sm bg-background"
+            >
+              <option value="">All Status</option>
+              {statuses.map(status => (
+                <option key={status} value={status}>{status}</option>
+              ))}
+            </select>
+            
+            <select
+              value={conditionFilter}
+              onChange={(e) => setConditionFilter(e.target.value)}
+              className="px-3 py-2 border rounded-md text-sm bg-background"
+            >
+              <option value="">All Conditions</option>
+              {conditions.map(condition => (
+                <option key={condition} value={condition}>{condition}</option>
+              ))}
+            </select>
+            
+            {(categoryFilter || statusFilter || conditionFilter || searchQuery) && (
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+            )}
+          </div>
+          
+          <Button onClick={() => setIsDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Equipment
+          </Button>
         </div>
-        <Button onClick={() => setIsDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Equipment
-        </Button>
+        
+        {/* Filter Summary */}
+        {(categoryFilter || statusFilter || conditionFilter || searchQuery) && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Filter className="h-4 w-4" />
+            <span>Filtered by: </span>
+            {searchQuery && <Badge variant="secondary">Search: "{searchQuery}"</Badge>}
+            {categoryFilter && <Badge variant="secondary">Category: {categoryFilter}</Badge>}
+            {statusFilter && <Badge variant="secondary">Status: {statusFilter}</Badge>}
+            {conditionFilter && <Badge variant="secondary">Condition: {conditionFilter}</Badge>}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -240,7 +336,9 @@ export function EquipmentTab() {
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Value:</span>
-                  <span className="font-medium">${(item.value || 0).toLocaleString()}</span>
+                  <span className="font-medium">
+                    {(item.value || item.unit_price || item.price || item.cost || 0).toLocaleString()} GNF
+                  </span>
                 </div>
                 {item.assignedProject && (
                   <div className="pt-2 border-t">
@@ -260,20 +358,22 @@ export function EquipmentTab() {
                 </div>
                 <div className="pt-3 border-t flex gap-2">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="flex-1 bg-transparent"
+                    className="flex-1"
                     onClick={() => openEditDialog(item)}
+                    title="Edit equipment"
                   >
-                    Edit
+                    <Edit className="h-4 w-4" />
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="flex-1 text-red-600 hover:text-red-700 bg-transparent"
+                    className="flex-1 text-red-600 hover:text-red-700 hover:bg-red-50"
                     onClick={() => handleDeleteEquipment(item.id)}
+                    title="Delete equipment"
                   >
-                    Delete
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </CardContent>

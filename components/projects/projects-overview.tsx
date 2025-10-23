@@ -8,16 +8,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Plus, Search, Pencil, Trash2 } from "lucide-react"
+import { Plus, Search, Pencil, Trash2, AlertCircle } from "lucide-react"
 import { api } from "@/lib/api"
 import { ProjectFormDialog } from "./project-form-dialog"
-
-const statusColors = {
-  "in-progress": "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-  planning: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
-  "on-hold": "bg-orange-500/10 text-orange-700 dark:text-orange-400",
-  completed: "bg-green-500/10 text-green-700 dark:text-green-400",
-}
+import { useProjectErrorHandler } from "@/hooks/use-error-handler"
+import { 
+  getStatusColor, 
+  getBudgetStatus, 
+  getBudgetColor, 
+  validateProject,
+  formatProgress,
+  PROJECT_STATUS_RULES
+} from "@/lib/project-logic"
 
 interface Project {
   id: string
@@ -34,6 +36,19 @@ interface Project {
   description: string
 }
 
+interface Task {
+  id: string
+  project: string
+  title: string
+  status: "pending" | "in-progress" | "completed"
+  priority: "low" | "medium" | "high"
+  assignee: string
+  start_date: string
+  end_date: string
+  progress: number
+  description: string
+}
+
 interface ProjectsOverviewProps {
   onSelectProject: (projectId: string) => void
 }
@@ -41,17 +56,16 @@ interface ProjectsOverviewProps {
 export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
   const [searchQuery, setSearchQuery] = useState("")
   const [projects, setProjects] = useState<Project[]>([])
-  const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const { isLoading, error, hasError, handleProjectError, withErrorHandling } = useProjectErrorHandler()
 
   useEffect(() => {
     loadProjects()
   }, [])
 
   const loadProjects = async () => {
-    try {
-      setLoading(true)
+    await withErrorHandling(async () => {
       const response = await api.projects.list()
       
       // Handle different response formats safely
@@ -70,12 +84,7 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
       }
       
       setProjects(projectsData)
-    } catch (error) {
-      console.error("Failed to load projects:", error)
-      setProjects([])
-    } finally {
-      setLoading(false)
-    }
+    }, { retryCount: 2, retryDelay: 1000 })
   }
 
   const filteredProjects = projects.filter(
@@ -98,29 +107,32 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
   const handleDeleteProject = async (projectId: string, e: React.MouseEvent) => {
     e.stopPropagation()
     if (confirm("Are you sure you want to delete this project?")) {
-      try {
+      await withErrorHandling(async () => {
         await api.projects.delete(projectId)
         setProjects(projects.filter((p) => p.id !== projectId))
-      } catch (error) {
-        console.error("Failed to delete project:", error)
-        alert("Failed to delete project")
-      }
+      }, { retryCount: 1 })
     }
   }
 
   const handleSubmitProject = async (projectData: any) => {
-    try {
+    const result = await withErrorHandling(async () => {
+      let updatedProject: Project
+      
       if (editingProject) {
-        const updatedProject = await api.projects.update(editingProject.id, projectData)
-        setProjects(projects.map((p) => (p.id === editingProject.id ? updatedProject as Project : p)))
+        updatedProject = await api.projects.update(editingProject.id, projectData) as Project
+        setProjects(projects.map((p) => (p.id === editingProject.id ? updatedProject : p)))
       } else {
-        const newProject = await api.projects.create(projectData)
-        setProjects([...projects, newProject as Project])
+        updatedProject = await api.projects.create(projectData) as Project
+        setProjects([...projects, updatedProject])
       }
+      
       setDialogOpen(false)
-    } catch (error) {
-      console.error("Failed to save project:", error)
-      alert("Failed to save project")
+      return updatedProject
+    }, { retryCount: 1 })
+
+    if (!result) {
+      // Error already handled by withErrorHandling
+      return
     }
   }
 
@@ -145,6 +157,10 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredProjects.map((project) => {
           const budgetUsed = (project.spent / project.budget) * 100
+          const budgetStatus = getBudgetStatus(project.spent, project.budget)
+          const validation = validateProject(project)
+          const statusRules = PROJECT_STATUS_RULES[project.status]
+          
           return (
             <Card key={project.id} className="cursor-pointer hover:shadow-md transition-shadow">
               <CardHeader>
@@ -153,26 +169,43 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
                     <CardTitle className="text-lg">{project.name}</CardTitle>
                     <CardDescription className="mt-1">{project.client_name}</CardDescription>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Badge variant="outline" className={statusColors[project.status]}>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant="outline" className={getStatusColor(project.status)}>
                       {project.status}
                     </Badge>
+                    {!validation.isValid && (
+                      <Badge variant="destructive" className="text-xs">
+                        Incohérence
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Progress</span>
-                    <span className="font-medium">{project.progress}%</span>
+                {/* Indicateur de cohérence statut/progression */}
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">Progression</span>
+                      <span className="font-medium">{formatProgress(project.progress)}</span>
+                    </div>
+                    <Progress value={project.progress} className="h-2" />
+                    {statusRules && (
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Plage autorisée: {statusRules.minProgress}% - {statusRules.maxProgress}%
+                      </div>
+                    )}
                   </div>
-                  <Progress value={project.progress} className="h-2" />
                 </div>
 
+                {/* Indicateur de budget */}
                 <div>
                   <div className="flex items-center justify-between text-sm mb-2">
                     <span className="text-muted-foreground">Budget</span>
-                    <span className="font-medium">{budgetUsed.toFixed(0)}% used</span>
+                    <Badge variant="outline" className={getBudgetColor(budgetStatus)}>
+                      {budgetStatus === "under-budget" ? "Sous-budget" : 
+                       budgetStatus === "on-budget" ? "Dans le budget" : "Dépassement"}
+                    </Badge>
                   </div>
                   <Progress value={budgetUsed} className="h-2" />
                   <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
@@ -181,24 +214,26 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
                   </div>
                 </div>
 
+                {/* Informations du projet */}
                 <div className="flex items-center justify-between text-sm pt-2 border-t">
                   <div>
                     <p className="text-muted-foreground">Manager</p>
                     <p className="font-medium">{project.manager_name}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-muted-foreground">Team</p>
-                    <p className="font-medium">{project.team_members.length} members</p>
+                    <p className="text-muted-foreground">Équipe</p>
+                    <p className="font-medium">{project.team_members.length} membres</p>
                   </div>
                 </div>
 
+                {/* Actions */}
                 <div className="flex gap-2 pt-2">
                   <Button
                     variant="outline"
                     className="flex-1 bg-transparent"
                     onClick={() => onSelectProject(project.id)}
                   >
-                    View Details
+                    Détails
                   </Button>
                   <Button variant="outline" size="icon" onClick={(e) => handleEditProject(project, e)}>
                     <Pencil className="h-4 w-4" />
@@ -207,6 +242,23 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
+
+                {/* Alertes de cohérence */}
+                {!validation.isValid && (
+                  <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-red-600 mt-0.5" />
+                      <div className="text-xs text-red-700">
+                        <strong>Incohérences détectées:</strong>
+                        <ul className="mt-1 list-disc list-inside">
+                          {validation.errors.map((error, index) => (
+                            <li key={index}>{error}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )

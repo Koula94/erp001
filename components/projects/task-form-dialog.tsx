@@ -44,6 +44,33 @@ export function TaskFormDialog({ open, onOpenChange, onSubmit, task, projectId }
     end_date: task?.end_date || "",
     progress: task?.progress || 0,
   })
+
+  // Reset form when task changes
+  useEffect(() => {
+    if (task) {
+      setFormData({
+        title: task.title || "",
+        description: task.description || "",
+        status: task.status || "pending",
+        priority: task.priority || "medium",
+        assignee: task.assignee || "",
+        start_date: task.start_date || "",
+        end_date: task.end_date || "",
+        progress: task.progress || 0,
+      })
+    } else {
+      setFormData({
+        title: "",
+        description: "",
+        status: "pending",
+        priority: "medium",
+        assignee: "",
+        start_date: "",
+        end_date: "",
+        progress: 0,
+      })
+    }
+  }, [task])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(false)
 

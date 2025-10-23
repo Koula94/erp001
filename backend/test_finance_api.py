@@ -113,7 +113,7 @@ class InvoiceAPITests(FinanceAPITestCase):
                 {
                     'description': 'New Service',
                     'quantity': 3,
-                    'unit_price': 500.00
+                    'unitPrice': 500.00
                 }
             ]
         }

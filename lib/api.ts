@@ -161,14 +161,16 @@ class ApiClient {
   }
 
   tasks = {
-    list: () => this.get("/projects/tasks/"),
+    list: (query?: string) => this.get(`/projects/tasks/${query ? `?${query}` : ""}`),
+    get: (id: string) => this.get(`/projects/tasks/${id}/`),
     create: (data: any) => this.post("/projects/tasks/", data),
     update: (id: string, data: any) => this.put(`/projects/tasks/${id}/`, data),
     delete: (id: string) => this.delete(`/projects/tasks/${id}/`),
   }
 
   milestones = {
-    list: () => this.get("/projects/milestones/"),
+    list: (query?: string) => this.get(`/projects/milestones/${query ? `?${query}` : ""}`),
+    get: (id: string) => this.get(`/projects/milestones/${id}/`),
     create: (data: any) => this.post("/projects/milestones/", data),
     update: (id: string, data: any) => this.put(`/projects/milestones/${id}/`, data),
     delete: (id: string) => this.delete(`/projects/milestones/${id}/`),
@@ -205,6 +207,7 @@ class ApiClient {
     create: (data: any) => this.post("/stock/materials/", data),
     update: (id: string, data: any) => this.put(`/stock/materials/${id}/`, data),
     delete: (id: string) => this.delete(`/stock/materials/${id}/`),
+    recalculateStatuses: () => this.post("/stock/materials/recalculate_statuses/", {}),
   }
 
   equipment = {
@@ -229,9 +232,12 @@ class ApiClient {
   // Finance
   invoices = {
     list: () => this.get("/finance/invoices/"),
+    get: (id: string) => this.get(`/finance/invoices/${id}/`),
     create: (data: any) => this.post("/finance/invoices/", data),
     update: (id: string, data: any) => this.put(`/finance/invoices/${id}/`, data),
     delete: (id: string) => this.delete(`/finance/invoices/${id}/`),
+    downloadPdf: (id: string) => this.get(`/finance/invoices/${id}/download_pdf/`),
+    preview: (id: string) => this.get(`/finance/invoices/${id}/preview/`),
   }
 
   expenses = {

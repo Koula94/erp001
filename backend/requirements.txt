@@ -5,3 +5,4 @@ djangorestframework-simplejwt==5.3.1
 python-decouple==3.8
 Pillow==10.2.0
 psycopg2-binary==2.9.9
+WeasyPrint==61.0
