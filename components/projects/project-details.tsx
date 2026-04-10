@@ -16,6 +16,7 @@ import { MilestoneFormDialog } from "./milestone-form-dialog"
 import { GanttChart } from "./gantt-chart"
 import { ProjectRisksCard } from "./project-risks-card"
 import { generateProjectNotifications } from "@/lib/project-logic"
+import { ExpenseFormDialog } from "@/components/finance/expense-form-dialog"
 
 const statusColors = {
   "in-progress": "bg-blue-500/10 text-blue-700 dark:text-blue-400",
@@ -78,6 +79,25 @@ interface Milestone {
   description: string
 }
 
+interface Expense {
+  id: string
+  description: string
+  category: string
+  amount: number
+  date: string
+  project: { id: string; name: string }
+  status: string
+  priority: string
+  submitted_by?: { id: string; name: string }
+  approved_by?: { id: string; name: string }
+  paid_by?: { id: string; name: string }
+  payment_date?: string
+  notes?: string
+  receipt?: string
+  created_at: string
+  updated_at: string
+}
+
 export function ProjectDetails({ projectId }: ProjectDetailsProps) {
   const [project, setProject] = useState<Project | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
@@ -85,8 +105,10 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
   const [loading, setLoading] = useState(true)
   const [taskDialogOpen, setTaskDialogOpen] = useState(false)
   const [milestoneDialogOpen, setMilestoneDialogOpen] = useState(false)
+  const [expenseDialogOpen, setExpenseDialogOpen] = useState(false)
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null)
+  const [expenses, setExpenses] = useState<Expense[]>([])
 
   useEffect(() => {
     loadProjectData()
@@ -95,17 +117,12 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
   const loadProjectData = async () => {
     try {
       setLoading(true)
-      console.log("Loading project data for ID:", projectId)
       
       const [projectData, tasksResponse, milestonesResponse] = await Promise.all([
         api.projects.get(projectId) as Promise<Project>,
         api.tasks.list(`?project=${projectId}`),
         api.milestones.list(`?project=${projectId}`)
       ])
-      
-      console.log("Project data:", projectData)
-      console.log("Tasks response:", tasksResponse)
-      console.log("Milestones response:", milestonesResponse)
       
       // Handle different response formats safely
       const tasksData = (Array.isArray(tasksResponse) ? tasksResponse : 
@@ -116,15 +133,9 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
                             (milestonesResponse && typeof milestonesResponse === 'object' && 'results' in milestonesResponse ? 
                              (milestonesResponse as any).results : [])) as Milestone[]
       
-      console.log("Processed tasks:", tasksData)
-      console.log("Processed milestones:", milestonesData)
-      
       // Filter tasks and milestones by project ID to ensure only this project's data is shown
       const filteredTasks = tasksData.filter(task => task.project === projectId)
       const filteredMilestones = milestonesData.filter(milestone => milestone.project === projectId)
-      
-      console.log("Filtered tasks:", filteredTasks)
-      console.log("Filtered milestones:", filteredMilestones)
       
       setProject(projectData)
       setTasks(filteredTasks)
@@ -235,6 +246,50 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
     }
   }
 
+  const handleSaveExpense = async (expenseData: any) => {
+    try {
+      console.log("Creating expense with data:", expenseData)
+      
+      // Create new expense with workflow
+      const response = await api.post('/finance/expenses/workflow/create/', {
+        project: projectId,
+        category: expenseData.category.toLowerCase(),
+        amount: parseFloat(expenseData.amount),
+        description: expenseData.description,
+        date: expenseData.date,
+        status: expenseData.status || 'draft',
+        priority: expenseData.priority || 'medium',
+        notes: expenseData.notes || '',
+      }) as any
+      
+      console.log("API Response:", response)
+      
+      if (response.success) {
+        const newExpense = response.expense
+        setExpenses([...expenses, newExpense])
+        
+        // Show warnings if any
+        if (response.warnings && response.warnings.length > 0) {
+          alert(`⚠️ Alertes: ${response.warnings.join(', ')}`)
+        }
+        
+        // Reload project to get updated budget
+        const updatedProject = await api.projects.get(projectId) as Project
+        setProject(updatedProject)
+        
+        alert("✅ Dépense créée avec succès!")
+      } else {
+        throw new Error(response.error || "Erreur inconnue lors de la création")
+      }
+      
+      setExpenseDialogOpen(false)
+    } catch (err: any) {
+      console.error("Error saving expense:", err)
+      const errorMessage = err.message || "Erreur lors de la sauvegarde"
+      alert(`❌ Échec de la création: ${errorMessage}`)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <Card>
@@ -307,6 +362,7 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
           <TabsTrigger value="tasks">Tasks</TabsTrigger>
           <TabsTrigger value="gantt">Gantt Chart</TabsTrigger>
           <TabsTrigger value="milestones">Milestones</TabsTrigger>
+          <TabsTrigger value="expenses">Dépenses</TabsTrigger>
           <TabsTrigger value="team">Team</TabsTrigger>
           <TabsTrigger value="budget">Budget</TabsTrigger>
         </TabsList>
@@ -502,6 +558,73 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
           </Card>
         </TabsContent>
 
+        <TabsContent value="expenses" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Dépenses du Projet</CardTitle>
+                  <CardDescription>Gérez les dépenses associées à ce projet</CardDescription>
+                </div>
+                <Button onClick={() => setExpenseDialogOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Nouvelle Dépense
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {expenses.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>Aucune dépense enregistrée pour ce projet</p>
+                  <p className="text-sm">Créez votre première dépense pour commencer</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Catégorie</TableHead>
+                      <TableHead>Montant</TableHead>
+                      <TableHead>Priorité</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Statut</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {expenses.map((expense) => (
+                      <TableRow key={expense.id}>
+                        <TableCell className="font-medium max-w-xs truncate">
+                          {expense.description}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className="bg-blue-500/10 text-blue-700">
+                            {expense.category}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-semibold">
+                          ${expense.amount.toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={priorityColors[expense.priority as keyof typeof priorityColors]}>
+                            {expense.priority}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={statusColors[expense.status as keyof typeof statusColors]}>
+                            {expense.status}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="budget" className="mt-6">
           <Card>
             <CardHeader>
@@ -561,6 +684,11 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
         onSubmit={handleSubmitMilestone}
         milestone={editingMilestone}
         projectId={projectId}
+      />
+      <ExpenseFormDialog
+        open={expenseDialogOpen}
+        onOpenChange={setExpenseDialogOpen}
+        onSubmit={handleSaveExpense}
       />
     </div>
   )

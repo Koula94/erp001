@@ -28,21 +28,19 @@ class Project(models.Model):
         return self.name
     
     def calculate_progress_from_tasks(self):
-        """Calcule la progression automatique basée sur les tâches"""
+        """Calcule la progression automatique basée sur les tâches.
+        
+        Utilise le champ 'progress' individuel de chaque tâche (0-100%) pondéré
+        par la priorité. Si une tâche est 'completed', elle compte pour 100%
+        quelle que soit sa valeur de progress. Si elle est 'pending', elle
+        contribue à 0% sauf si un progress > 0 a été explicitement défini.
+        """
         tasks = self.tasks.all()
         
         if not tasks.exists():
             return 0
         
-        # Calcul simple basé sur le nombre de tâches
-        total_tasks = tasks.count()
-        completed_tasks = tasks.filter(status='completed').count()
-        in_progress_tasks = tasks.filter(status='in-progress').count()
-        
-        # Progression simple : tâches terminées = 100%, en cours = 50%, en attente = 0%
-        simple_progress = ((completed_tasks * 100) + (in_progress_tasks * 50)) / total_tasks
-        
-        # Calcul pondéré basé sur la priorité des tâches
+        # Pondération par priorité
         priority_weights = {
             'high': 3,
             'medium': 2,
@@ -50,24 +48,29 @@ class Project(models.Model):
         }
         
         total_weight = 0
-        completed_weight = 0
+        weighted_sum = 0
         
         for task in tasks:
             weight = priority_weights.get(task.priority, 1)
             total_weight += weight
             
+            # Déterminer la progression effective de la tâche
             if task.status == 'completed':
-                completed_weight += weight
-            elif task.status == 'in-progress':
-                completed_weight += weight * 0.5
+                # Une tâche terminée = 100% quelle que soit la valeur stored
+                task_progress = 100
+            elif task.status == 'pending':
+                # Tâche en attente : utiliser 0 (ignorer un éventuel progress résiduel)
+                task_progress = 0
+            else:
+                # Tâche en cours : utiliser la valeur réelle de progress (0-100)
+                task_progress = task.progress if task.progress is not None else 0
+            
+            weighted_sum += weight * task_progress
         
-        weighted_progress = (completed_weight / total_weight) * 100 if total_weight > 0 else 0
+        if total_weight == 0:
+            return 0
         
-        # Utiliser la progression pondérée si elle est significativement différente
-        if abs(simple_progress - weighted_progress) > 10:
-            return round(weighted_progress)
-        else:
-            return round(simple_progress)
+        return round(weighted_sum / total_weight)
     
     def get_auto_status(self, progress):
         """Détermine automatiquement le statut basé sur la progression avec règles de cohérence"""

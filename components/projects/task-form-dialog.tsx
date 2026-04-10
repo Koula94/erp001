@@ -34,18 +34,34 @@ interface Employee {
 }
 
 export function TaskFormDialog({ open, onOpenChange, onSubmit, task, projectId }: TaskFormDialogProps) {
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [loading, setLoading] = useState(false)
+
+  // Helper: find the employee id (emp.id) that corresponds to a user id (task.assignee)
+  const resolveAssigneeEmployeeId = (userIdOrEmployeeId: any, empList: Employee[]): string => {
+    if (!userIdOrEmployeeId) return ""
+    const numericId = Number(userIdOrEmployeeId)
+    // First try: match by employee's user field (task.assignee is a user ID)
+    const byUser = empList.find(emp => Number(emp.user) === numericId)
+    if (byUser) return byUser.id
+    // Fallback: match by employee id itself (already an employee ID)
+    const byEmpId = empList.find(emp => emp.id === String(userIdOrEmployeeId))
+    if (byEmpId) return byEmpId.id
+    return ""
+  }
+
   const [formData, setFormData] = useState({
     title: task?.title || "",
     description: task?.description || "",
     status: task?.status || "pending",
     priority: task?.priority || "medium",
-    assignee: task?.assignee || "",
+    assignee: "",
     start_date: task?.start_date || "",
     end_date: task?.end_date || "",
     progress: task?.progress || 0,
   })
 
-  // Reset form when task changes
+  // Reset form when task or employees list changes
   useEffect(() => {
     if (task) {
       setFormData({
@@ -53,7 +69,7 @@ export function TaskFormDialog({ open, onOpenChange, onSubmit, task, projectId }
         description: task.description || "",
         status: task.status || "pending",
         priority: task.priority || "medium",
-        assignee: task.assignee || "",
+        assignee: resolveAssigneeEmployeeId(task.assignee, employees),
         start_date: task.start_date || "",
         end_date: task.end_date || "",
         progress: task.progress || 0,
@@ -70,9 +86,7 @@ export function TaskFormDialog({ open, onOpenChange, onSubmit, task, projectId }
         progress: 0,
       })
     }
-  }, [task])
-  const [employees, setEmployees] = useState<Employee[]>([])
-  const [loading, setLoading] = useState(false)
+  }, [task, employees])
 
   useEffect(() => {
     if (open) {
@@ -104,6 +118,8 @@ export function TaskFormDialog({ open, onOpenChange, onSubmit, task, projectId }
     // Find the selected employee to get the user ID
     const selectedEmployee = employees.find(emp => emp.id === formData.assignee)
     
+    // Pass data to parent handler — the parent is responsible for closing the dialog
+    // after the async API call completes (and after reloading the project progress)
     onSubmit({
       ...task,
       ...formData,
@@ -113,7 +129,9 @@ export function TaskFormDialog({ open, onOpenChange, onSubmit, task, projectId }
       start_date: formData.start_date,
       end_date: formData.end_date,
     })
-    onOpenChange(false)
+    // NOTE: do NOT call onOpenChange(false) here — the parent (handleSubmitTask)
+    // already calls setTaskDialogOpen(false) once the task is saved AND the
+    // project progress has been reloaded from the backend.
   }
 
   return (

@@ -214,7 +214,7 @@ export function CRMDashboard() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+            <CardTitle className="text-sm font-medium">Nombre total de clients</CardTitle>
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -222,7 +222,7 @@ export function CRMDashboard() {
             <div className="flex items-center text-xs text-muted-foreground">
               <span className="text-green-600 mr-1">{stats.activeClients} active</span>
               <span>•</span>
-              <span className="text-blue-600 ml-1">{stats.prospectClients} prospects</span>
+              <span className="text-blue-600 ml-1">{stats.prospectClients} perspectives</span>
             </div>
           </CardContent>
         </Card>
@@ -235,9 +235,9 @@ export function CRMDashboard() {
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalQuotes}</div>
             <div className="flex items-center text-xs text-muted-foreground">
-              <span className="text-yellow-600 mr-1">{stats.pendingQuotes} pending</span>
+              <span className="text-yellow-600 mr-1">{stats.pendingQuotes} en attente</span>
               <span>•</span>
-              <span className="text-green-600 ml-1">{stats.approvedQuotes} approved</span>
+              <span className="text-green-600 ml-1">{stats.approvedQuotes} approuvés</span>
             </div>
           </CardContent>
         </Card>

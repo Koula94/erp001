@@ -14,7 +14,7 @@ export default function CRMPage() {
     <div className="flex flex-col gap-6 p-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">CRM</h1>
-        <p className="text-muted-foreground">Manage clients, quotes, and communications</p>
+        <p className="text-muted-foreground">Gérer les clients, les devis et les communications</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

@@ -58,9 +58,9 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          title="Total Revenue"
-          value={stats?.revenue.current || 0}
-          change={stats?.revenue.change || 0}
+          title="Total Project "
+          // value={stats?.revenue.current || 0}
+          // change={stats?.revenue.change || 0}
           icon={DollarSign}
           format="currency"
         />

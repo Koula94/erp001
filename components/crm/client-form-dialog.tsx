@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -49,6 +49,31 @@ export function ClientFormDialog({ open, onOpenChange, client, onSave }: ClientF
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Update form data when client prop changes
+  useEffect(() => {
+    if (client) {
+      setFormData({
+        name: client.name || "",
+        email: client.email || "",
+        phone: client.phone || "",
+        address: client.address || "",
+        status: client.status || "prospect",
+        contactPerson: client.contact_person || "",
+      })
+    } else {
+      // Reset form for new client
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        address: "",
+        status: "prospect",
+        contactPerson: "",
+      })
+    }
+    setErrors({})
+  }, [client])
 
   // Validation functions
   const validateEmail = (email: string): boolean => {

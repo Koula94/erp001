@@ -50,13 +50,37 @@ class ApiClient {
     })
 
     if (!response.ok) {
-      let errorMessage = await response.text()
+      let errorMessage = `HTTP ${response.status} error`
       try {
-        // Try to parse as JSON for structured error messages
-        const errorData = JSON.parse(errorMessage)
-        errorMessage = errorData.detail || errorData.message || errorMessage
+        const rawText = await response.text()
+        if (rawText) {
+          try {
+            // Try to parse as JSON for structured error messages
+            const errorData = JSON.parse(rawText)
+            if (errorData.detail) {
+              // Standard DRF error format: { "detail": "..." }
+              errorMessage = errorData.detail
+            } else if (errorData.message) {
+              errorMessage = errorData.message
+            } else if (typeof errorData === 'object' && !Array.isArray(errorData)) {
+              // DRF field validation errors: { "field": ["error1", "error2"], ... }
+              const fieldErrors = Object.entries(errorData)
+                .map(([field, errors]) => {
+                  const msgs = Array.isArray(errors) ? errors.join(', ') : String(errors)
+                  return field === 'non_field_errors' ? msgs : `${field}: ${msgs}`
+                })
+                .join(' | ')
+              errorMessage = fieldErrors || rawText
+            } else {
+              errorMessage = rawText
+            }
+          } catch {
+            // Not JSON – use the raw text
+            errorMessage = rawText
+          }
+        }
       } catch {
-        // If not JSON, use the text as is
+        // response.text() failed
       }
       
       const error: ApiError = {
@@ -257,7 +281,8 @@ class ApiClient {
     list: () => this.get("/users/"),
     get: (id: string) => this.get(`/users/${id}/`),
     create: (data: any) => this.post("/users/", data),
-    update: (id: string, data: any) => this.put(`/users/${id}/`, data),
+    // Use PATCH for partial update — avoids "is_active: This field is required" DRF error
+    update: (id: string, data: any) => this.patch(`/users/${id}/`, data),
     delete: (id: string) => this.delete(`/users/${id}/`),
   }
 }

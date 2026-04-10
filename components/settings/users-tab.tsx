@@ -70,7 +70,7 @@ export function UsersTab() {
   const handleSaveUser = async (userData: Partial<User>) => {
     try {
       if (editingUser) {
-        // Update existing user
+        // Update existing user (PATCH for partial update)
         const updatedUser = await api.users.update(editingUser.id, userData)
         setUsers(users.map((u) => (u.id === editingUser.id ? updatedUser as User : u)))
       } else {
@@ -81,8 +81,11 @@ export function UsersTab() {
       setDialogOpen(false)
       setError(null)
     } catch (err: any) {
-      setError(err.message || "Failed to save user")
-      console.error("Error saving user:", err)
+      // Extract message from both plain ApiError objects and native Error instances
+      const errorMessage = err?.message || (typeof err === 'string' ? err : "Failed to save user")
+      setError(errorMessage)
+      // Use a safe log to avoid Next.js treating it as an unhandled error
+      console.warn("Error saving user:", errorMessage, err)
     }
   }
 

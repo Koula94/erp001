@@ -190,7 +190,7 @@ export function ClientsTab() {
       <Card>
         <CardHeader>
           <CardTitle>Clients</CardTitle>
-          <CardDescription>Manage your client relationships and contacts</CardDescription>
+          <CardDescription>Gérer les relations client et contact</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -205,12 +205,12 @@ export function ClientsTab() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Client Name</TableHead>
-                  <TableHead>Contact Person</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Projects</TableHead>
-                  <TableHead>Revenue</TableHead>
-                  <TableHead>Last Updated</TableHead>
+                  <TableHead>Nom du client</TableHead>
+                  <TableHead>Personne de contact</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Projets</TableHead>
+                  <TableHead>Revenu</TableHead>
+                  <TableHead>Dernière mise à jour</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -238,14 +238,14 @@ export function ClientsTab() {
                           <DialogContent className="max-w-2xl">
                             <DialogHeader>
                               <DialogTitle>{client.name}</DialogTitle>
-                              <DialogDescription>Client details and information</DialogDescription>
+                              <DialogDescription>Détails et informations sur le client</DialogDescription>
                             </DialogHeader>
                             <div className="space-y-6">
                               <div className="grid gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
                                   <div className="flex items-center gap-2 text-sm">
                                     <Building2 className="h-4 w-4 text-muted-foreground" />
-                                    <span className="font-medium">Contact Person:</span>
+                                    <span className="font-medium">Personne de contact:</span>
                                     <span>{client.contact_person}</span>
                                   </div>
                                   <div className="flex items-center gap-2 text-sm">
@@ -255,13 +255,13 @@ export function ClientsTab() {
                                   </div>
                                   <div className="flex items-center gap-2 text-sm">
                                     <Phone className="h-4 w-4 text-muted-foreground" />
-                                    <span className="font-medium">Phone:</span>
+                                    <span className="font-medium">Téléphone:</span>
                                     <span>{client.phone}</span>
                                   </div>
                                   <div className="flex items-start gap-2 text-sm">
                                     <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                                     <div>
-                                      <span className="font-medium">Address:</span>
+                                      <span className="font-medium">Adresse:</span>
                                       <p className="text-muted-foreground">{client.address}</p>
                                     </div>
                                   </div>
@@ -269,25 +269,25 @@ export function ClientsTab() {
                                 <div className="space-y-4">
                                   <Card>
                                     <CardHeader className="pb-3">
-                                      <CardTitle className="text-sm">Statistics</CardTitle>
+                                      <CardTitle className="text-sm">Statistiques</CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-2">
                                       <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Total Projects:</span>
+                                        <span className="text-muted-foreground">Total des projets:</span>
                                         <span className="font-medium">{client.total_projects}</span>
                                       </div>
                                       <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Total Revenue:</span>
+                                        <span className="text-muted-foreground">Revenu total:</span>
                                         <span className="font-medium">${parseFloat(client.total_revenue).toLocaleString()}</span>
                                       </div>
                                       <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Status:</span>
+                                        <span className="text-muted-foreground">Statut:</span>
                                         <Badge variant="outline" className={statusColors[client.status]}>
                                           {client.status}
                                         </Badge>
                                       </div>
                                       <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Last Updated:</span>
+                                        <span className="text-muted-foreground">Dernière mise à jour:</span>
                                         <span className="font-medium">
                                           {new Date(client.updated_at).toLocaleDateString()}
                                         </span>
