@@ -140,12 +140,49 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
     try {
       setLoading(true)
       
-      const [projectData, tasksResponse, milestonesResponse, operationsResponse] = await Promise.all([
-        api.projects.get(projectId) as Promise<Project>,
-        api.tasks.list(`?project=${projectId}`),
-        api.milestones.list(`?project=${projectId}`),
-        api.get(`/finance/operation-requests/?project=${projectId}`)
-      ])
+      // Vérifier si l'utilisateur est authentifié
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        throw new Error('Utilisateur non authentifié. Veuillez vous connecter.')
+      }
+      
+      // Appeler chaque API individuellement pour mieux déboguer
+      let projectData: Project
+      let tasksResponse: any
+      let milestonesResponse: any
+      let operationsResponse: any
+      
+      try {
+        projectData = await api.projects.get(projectId) as Project
+        console.log("Project data loaded:", projectData)
+      } catch (err: any) {
+        console.error("Failed to load project:", err)
+        throw new Error(`Échec du chargement du projet: ${err.message || 'Erreur inconnue'}`)
+      }
+      
+      try {
+        tasksResponse = await api.tasks.list(`?project=${projectId}`)
+        console.log("Tasks response:", tasksResponse)
+      } catch (err: any) {
+        console.error("Failed to load tasks:", err)
+        tasksResponse = [] // Continuer avec une liste vide
+      }
+      
+      try {
+        milestonesResponse = await api.milestones.list(`?project=${projectId}`)
+        console.log("Milestones response:", milestonesResponse)
+      } catch (err: any) {
+        console.error("Failed to load milestones:", err)
+        milestonesResponse = [] // Continuer avec une liste vide
+      }
+      
+      try {
+        operationsResponse = await api.get(`/finance/operation-requests/?project=${projectId}`)
+        console.log("Operations response:", operationsResponse)
+      } catch (err: any) {
+        console.error("Failed to load operations:", err)
+        operationsResponse = [] // Continuer avec une liste vide
+      }
       
       // Handle different response formats safely
       const tasksData = (Array.isArray(tasksResponse) ? tasksResponse : 
@@ -175,8 +212,22 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
       setTasks(filteredTasks)
       setMilestones(filteredMilestones)
       setOperations(filteredOperations)
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load project data:", error)
+      console.error("Error details:", {
+        message: error?.message || 'Unknown error',
+        stack: error?.stack || 'No stack trace',
+        name: error?.name || 'Unknown',
+        status: error?.status || 'No status',
+        response: error?.response || 'No response'
+      })
+      
+      // Afficher un message d'erreur plus clair
+      if (error?.message?.includes('401') || error?.status === 401) {
+        alert('Erreur d\'authentification. Veuillez vous connecter.')
+      } else if (error?.message) {
+        alert(`Erreur: ${error.message}`)
+      }
     } finally {
       setLoading(false)
     }
@@ -349,12 +400,21 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
 
   const handleSubmitOperation = async (operationData: any) => {
     try {
+      // Vérifier si l'utilisateur est authentifié
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        alert('Utilisateur non authentifié. Veuillez vous connecter.')
+        window.location.href = '/login'
+        return
+      }
+      
+      let result: OperationRequest
       if (editingOperation) {
-        const updatedOperation = await api.operations.update(editingOperation.id, operationData) as OperationRequest
-        setOperations(operations.map((o) => (o.id === editingOperation.id ? updatedOperation : o)))
+        result = await api.operations.update(editingOperation.id, operationData) as OperationRequest
+        setOperations(operations.map((o) => (o.id === editingOperation.id ? result : o)))
       } else {
-        const newOperation = await api.operations.create({ ...operationData, project: projectId }) as OperationRequest
-        setOperations([...operations, newOperation])
+        result = await api.operations.create({ ...operationData, project: projectId }) as OperationRequest
+        setOperations([...operations, result])
       }
       
       // Reload project to get updated budget
@@ -362,10 +422,24 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
       setProject(updatedProject)
       
       setOperationDialogOpen(false)
+      alert('✅ Opération sauvegardée avec succès!')
     } catch (error: any) {
       console.error("Failed to save operation:", error)
-      const errorMessage = error.message || "Échec de la sauvegarde"
-      alert(`Échec de la sauvegarde: ${errorMessage}`)
+      console.error("Error details:", {
+        message: error?.message || 'Unknown error',
+        stack: error?.stack || 'No stack trace',
+        name: error?.name || 'Unknown',
+        status: error?.status || 'No status',
+        response: error?.response || 'No response'
+      })
+      
+      const errorMessage = error?.message || "Échec de la sauvegarde"
+      alert(`❌ Échec de la sauvegarde: ${errorMessage}`)
+      
+      // Rediriger vers le login si erreur d'authentification
+      if (error?.message?.includes('401') || error?.status === 401) {
+        window.location.href = '/login'
+      }
     }
   }
 
@@ -379,6 +453,9 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
           break
         case 'validate':
           response = await api.operations.validate(operationId, data)
+          break
+        case 'pay':
+          response = await api.post(`/finance/operation-requests/${operationId}/pay/`, data || {})
           break
         case 'reject':
           response = await api.operations.reject(operationId, data)
@@ -411,6 +488,7 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
     draft: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
     submitted: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
     validated: "bg-green-500/10 text-green-700 dark:text-green-400",
+    paid: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
     rejected: "bg-red-500/10 text-red-700 dark:text-red-400",
   }
 
@@ -708,6 +786,7 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
                             {operation.status === 'draft' && 'Brouillon'}
                             {operation.status === 'submitted' && 'Soumis'}
                             {operation.status === 'validated' && 'Validé'}
+                            {operation.status === 'paid' && 'Payé'}
                             {operation.status === 'rejected' && 'Rejeté'}
                           </Badge>
                         </TableCell>

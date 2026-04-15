@@ -331,7 +331,7 @@ class OperationRequestViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Validation du budget
+        # Validation du budget (vérification seulement, pas de déduction)
         budget_valid, budget_message = operation.validate_budget_availability()
         if not budget_valid:
             return Response(
@@ -345,7 +345,40 @@ class OperationRequestViewSet(viewsets.ModelViewSet):
         operation.validation_date = request.data.get('validation_date')
         operation.save()
         
-        # Mise à jour du budget du projet si associé
+        # NOTE: La déduction du budget se fera lors du paiement, pas lors de la validation
+        
+        serializer = self.get_serializer(operation)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def pay(self, request, pk=None):
+        """Payer une demande d'opération validée avec justificatif"""
+        operation = self.get_object()
+        
+        if operation.status != 'validated':
+            return Response(
+                {'error': 'Seules les demandes validées peuvent être payées'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validation du budget avant paiement
+        budget_valid, budget_message = operation.validate_budget_availability()
+        if not budget_valid:
+            return Response(
+                {'error': f'Budget insuffisant pour le paiement: {budget_message}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Gestion du fichier de justificatif
+        payment_proof = request.FILES.get('payment_proof')
+        if payment_proof:
+            operation.payment_proof = payment_proof
+        
+        # Mise à jour du statut
+        operation.status = 'paid'
+        operation.save()
+        
+        # Mise à jour du budget du projet (déduction au moment du paiement)
         if operation.project:
             operation.project.spent += operation.total_amount
             operation.project.save()
