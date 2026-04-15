@@ -172,6 +172,7 @@ class OperationRequest(models.Model):
         ('draft', 'Brouillon'),
         ('submitted', 'Soumis'),
         ('validated', 'Validé'),
+        ('paid', 'Payé'),
         ('rejected', 'Rejeté'),
     ]
     
@@ -201,6 +202,7 @@ class OperationRequest(models.Model):
     validated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='validated_operations')
     validation_date = models.DateField(null=True, blank=True)
     rejection_reason = models.TextField(blank=True, verbose_name="Raison du rejet")
+    payment_proof = models.FileField(upload_to='payment_proofs/%Y/%m/%d/', null=True, blank=True, verbose_name="Justificatif de paiement")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

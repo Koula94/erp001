@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Search, FileText, Edit, Trash2, Loader2, CheckCircle, XCircle, Send } from "lucide-react"
+import { Plus, Search, FileText, Edit, Trash2, Loader2, CheckCircle, XCircle, Send, CreditCard, Paperclip } from "lucide-react"
 import { api } from "@/lib/api"
 import { OperationFormDialog } from "./operation-form-dialog"
 import {
@@ -24,6 +24,7 @@ const statusColors: { [key: string]: string } = {
   draft: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
   submitted: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
   validated: "bg-green-500/10 text-green-700 dark:text-green-400",
+  paid: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
   rejected: "bg-red-500/10 text-red-700 dark:text-red-400",
 }
 
@@ -39,7 +40,8 @@ const periodLabels: { [key: string]: string } = {
 interface OperationRequest {
   id: string
   reference: string
-  project: { id: string; name: string }
+  project?: { id: string; name: string }
+  project_name?: string
   task_name: string
   requester: { id: string; name: string }
   request_date: string
@@ -70,13 +72,37 @@ export function OperationsTab() {
   const loadOperations = async () => {
     try {
       setLoading(true)
+      
+      // Vérifier si l'utilisateur est authentifié
+      const token = localStorage.getItem('access_token')
+      if (!token) {
+        // Rediriger vers la page de login
+        window.location.href = '/login'
+        return
+      }
+      
       const response = await api.get('/finance/operation-requests/') as any
       const data = Array.isArray(response) ? response : response.results || response.data || []
       setOperations(data as OperationRequest[])
       setError(null)
-    } catch (err) {
-      setError("Failed to load operation requests")
+    } catch (err: any) {
       console.error("Error loading operation requests:", err)
+      console.error("Error details:", {
+        message: err?.message || 'Unknown error',
+        stack: err?.stack || 'No stack trace',
+        name: err?.name || 'Unknown',
+        status: err?.status || 'No status',
+        response: err?.response || 'No response'
+      })
+      
+      setError(`Échec du chargement des opérations: ${err?.message || 'Erreur inconnue'}`)
+      
+      // Afficher un message d'erreur plus clair
+      if (err?.message?.includes('401') || err?.status === 401) {
+        alert('Erreur d\'authentification. Veuillez vous connecter.')
+        // Rediriger vers la page de login
+        window.location.href = '/login'
+      }
     } finally {
       setLoading(false)
     }
@@ -118,6 +144,51 @@ export function OperationsTab() {
         case 'validate':
           response = await api.post(`/finance/operation-requests/${operationId}/validate/`, data || {})
           break
+        case 'pay':
+          // Créer un input file pour uploader le justificatif
+          const input = document.createElement('input')
+          input.type = 'file'
+          input.accept = '.pdf,.jpg,.jpeg,.png,.doc,.docx'
+          input.onchange = async (e: any) => {
+            const file = e.target.files[0]
+            if (!file) return
+            
+            try {
+              // Créer un FormData pour envoyer le fichier
+              const formData = new FormData()
+              formData.append('payment_proof', file)
+              
+              // Envoyer la requête avec le fichier
+              const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'}/finance/operation-requests/${operationId}/pay/`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+                },
+                body: formData
+              })
+              
+              if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+              }
+              
+              const data = await response.json()
+              
+              if (data.id) {
+                // Update local state
+                setOperations(operations.map((o) => (o.id === operationId ? data : o)))
+                
+                // Show success message
+                alert(`✅ Paiement effectué avec succès! Justificatif téléchargé: ${file.name}`)
+              } else {
+                throw new Error(data.error || "Action failed")
+              }
+            } catch (err) {
+              setError(`Failed to process payment: ${err}`)
+              console.error("Error processing payment:", err)
+            }
+          }
+          input.click()
+          return // Retourner ici car l'action est asynchrone via l'input file
         case 'reject':
           response = await api.post(`/finance/operation-requests/${operationId}/reject/`, data || {})
           break
@@ -246,14 +317,15 @@ export function OperationsTab() {
                     <TableCell>{formatDate(operation.request_date)}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">
-                        {operation.project?.name || "Sans projet"}
+                        {operation.project_name || operation.project?.name || "Sans objet"}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                      <TableCell>
                       <Badge variant="outline" className={statusColors[operation.status]}>
                         {operation.status === 'draft' && 'Brouillon'}
                         {operation.status === 'submitted' && 'Soumis'}
                         {operation.status === 'validated' && 'Validé'}
+                        {operation.status === 'paid' && 'Payé'}
                         {operation.status === 'rejected' && 'Rejeté'}
                       </Badge>
                     </TableCell>
@@ -299,6 +371,17 @@ export function OperationsTab() {
                               Rejeter
                             </Button>
                           </>
+                        )}
+                        {operation.status === 'validated' && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs bg-purple-500/10 text-purple-700 hover:bg-purple-500/20"
+                            onClick={() => handleWorkflowAction(operation.id, 'pay')}
+                          >
+                            <CreditCard className="h-3 w-3 mr-1" />
+                            Payer
+                          </Button>
                         )}
                       </div>
                     </TableCell>

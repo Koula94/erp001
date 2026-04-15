@@ -66,6 +66,7 @@ class OperationRequestSerializer(serializers.ModelSerializer):
     requester_name = serializers.CharField(source='requester.get_full_name', read_only=True)
     validated_by_name = serializers.CharField(source='validated_by.get_full_name', read_only=True)
     workflow_status = serializers.CharField(source='get_workflow_status', read_only=True)
+    payment_proof_url = serializers.FileField(source='payment_proof', read_only=True)
     
     class Meta:
         model = OperationRequest
