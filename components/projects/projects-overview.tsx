@@ -156,7 +156,7 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {filteredProjects.map((project) => {
-          const budgetUsed = (project.spent / project.budget) * 100
+          const budgetUsed = project.budget > 0 ? (project.spent / project.budget) * 100 : 0
           const budgetStatus = getBudgetStatus(project.spent, project.budget)
           const validation = validateProject(project)
           const statusRules = PROJECT_STATUS_RULES[project.status]
@@ -201,16 +201,17 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
                 {/* Indicateur de budget */}
                 <div>
                   <div className="flex items-center justify-between text-sm mb-2">
-                    <span className="text-muted-foreground">Budget</span>
+                    <span className="text-muted-foreground">Budget du projet</span>
                     <Badge variant="outline" className={getBudgetColor(budgetStatus)}>
                       {budgetStatus === "under-budget" ? "Sous-budget" : 
-                       budgetStatus === "on-budget" ? "Dans le budget" : "Dépassement"}
+                       budgetStatus === "on-budget" ? "Dans le budget" : 
+                       budgetStatus === "over-budget" ? "Dépassement" : "Pas de budget"}
                     </Badge>
                   </div>
                   <Progress value={budgetUsed} className="h-2" />
                   <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
-                    <span>${project.spent.toLocaleString()}</span>
-                    <span>${project.budget.toLocaleString()}</span>
+                    <span>Dépensé: ${project.spent.toLocaleString()}</span>
+                    <span>Total: ${project.budget.toLocaleString()}</span>
                   </div>
                 </div>
 

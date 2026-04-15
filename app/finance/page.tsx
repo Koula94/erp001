@@ -6,6 +6,7 @@ import { InvoicesTab } from "@/components/finance/invoices-tab"
 import { ExpensesTab } from "@/components/finance/expenses-tab"
 import { BudgetsTab } from "@/components/finance/budgets-tab"
 import { ReportsTab } from "@/components/finance/reports-tab"
+import { OperationsTab } from "@/components/finance/operations-tab"
 import { FinanceOverview } from "@/components/finance/finance-overview"
 
 export default function FinancePage() {
@@ -24,6 +25,7 @@ export default function FinancePage() {
         <TabsList>
           <TabsTrigger value="invoices">Invoices</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
+          <TabsTrigger value="operations">Operations</TabsTrigger>
           <TabsTrigger value="budgets">Budgets</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
@@ -34,6 +36,10 @@ export default function FinancePage() {
 
         <TabsContent value="expenses" className="mt-6">
           <ExpensesTab />
+        </TabsContent>
+
+        <TabsContent value="operations" className="mt-6">
+          <OperationsTab />
         </TabsContent>
 
         <TabsContent value="budgets" className="mt-6">

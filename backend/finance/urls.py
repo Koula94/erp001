@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import InvoiceViewSet, ExpenseViewSet, BudgetViewSet
+from .views import InvoiceViewSet, ExpenseViewSet, BudgetViewSet, OperationRequestViewSet
 from .views_workflow import (
     create_expense_workflow,
     submit_expense_for_approval,
@@ -16,6 +16,7 @@ router = DefaultRouter()
 router.register(r'invoices', InvoiceViewSet)
 router.register(r'expenses', ExpenseViewSet)
 router.register(r'budgets', BudgetViewSet)
+router.register(r'operation-requests', OperationRequestViewSet, basename='operation-requests')
 
 urlpatterns = [
     path('', include(router.urls)),

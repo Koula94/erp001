@@ -143,8 +143,8 @@
             <tr>
                 <td>{{ item.description }}</td>
                 <td>{{ item.quantity }}</td>
-                <td>{{ item.unit_price }} €</td>
-                <td>{{ item.total }} €</td>
+                <td>{{ item.unit_price }} GNF</td>
+                <td>{{ item.total }} GNF</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -153,17 +153,17 @@
     <div class="totals">
         <div class="total-row">
             <span>Sous-total:</span>
-            <span>{{ subtotal|floatformat:2 }} €</span>
+            <span>{{ subtotal|floatformat:2 }} GNF</span>
         </div>
         {% if tax_amount %}
         <div class="total-row">
             <span>TVA:</span>
-            <span>{{ tax_amount|floatformat:2 }} €</span>
+            <span>{{ tax_amount|floatformat:2 }} GNF</span>
         </div>
         {% endif %}
         <div class="total-row final">
             <span>TOTAL:</span>
-            <span>{{ total_amount|floatformat:2 }} €</span>
+            <span>{{ total_amount|floatformat:2 }} GNF</span>
         </div>
     </div>
 

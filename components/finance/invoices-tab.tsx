@@ -285,7 +285,7 @@ export function InvoicesTab() {
     // Show invoice details in a toast
     toast({
       title: `Facture ${invoice.invoice_number}`,
-      description: `Client: ${invoice.client_name} | Montant: ${invoice.amount} € | Statut: ${invoice.status} | Date d'échéance: ${new Date(invoice.due_date).toLocaleDateString()}`,
+      description: `Client: ${invoice.client_name} | Montant: ${invoice.amount} GNF | Statut: ${invoice.status} | Date d'échéance: ${new Date(invoice.due_date).toLocaleDateString()}`,
     })
     
     // TODO: Implement a proper invoice preview dialog
@@ -379,10 +379,10 @@ export function InvoicesTab() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
-                  <p className="text-2xl font-bold">${invoiceStats.totalAmount.toLocaleString()}</p>
+                  <p className="text-2xl font-bold">GNF{invoiceStats.totalAmount.toLocaleString()}</p>
                 </div>
                 <div className="h-8 w-8 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 dark:text-green-400 text-sm font-bold">$</span>
+                  <span className="text-green-600 dark:text-green-400 text-sm font-bold">GNF</span>
                 </div>
               </div>
             </CardContent>
@@ -451,7 +451,7 @@ export function InvoicesTab() {
                     <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
                     <TableCell>{invoice.client_name || "N/A"}</TableCell>
                     <TableCell className="truncate max-w-[200px]">{invoice.project_name || "N/A"}</TableCell>
-                    <TableCell>${invoice.amount.toLocaleString()}</TableCell>
+                    <TableCell>GNF{invoice.amount.toLocaleString()}</TableCell>
                     <TableCell>{new Date(invoice.due_date).toLocaleDateString()}</TableCell>
                     <TableCell>
                       <Badge variant="outline" className={statusColors[invoice.status]}>

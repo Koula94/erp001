@@ -276,6 +276,20 @@ class ApiClient {
     update: (id: string, data: any) => this.put(`/finance/budgets/${id}/`, data),
   }
 
+  operations = {
+    list: () => this.get("/finance/operation-requests/"),
+    get: (id: string) => this.get(`/finance/operation-requests/${id}/`),
+    create: (data: any) => this.post("/finance/operation-requests/", data),
+    update: (id: string, data: any) => this.put(`/finance/operation-requests/${id}/`, data),
+    delete: (id: string) => this.delete(`/finance/operation-requests/${id}/`),
+    submit: (id: string) => this.post(`/finance/operation-requests/${id}/submit/`, {}),
+    validate: (id: string, data?: any) => this.post(`/finance/operation-requests/${id}/validate/`, data || {}),
+    reject: (id: string, data: any) => this.post(`/finance/operation-requests/${id}/reject/`, data),
+    summary: () => this.get("/finance/operation-requests/summary/"),
+    myRequests: () => this.get("/finance/operation-requests/my_requests/"),
+    pendingValidation: () => this.get("/finance/operation-requests/pending_validation/"),
+  }
+
   // Users
   users = {
     list: () => this.get("/users/"),

@@ -447,9 +447,14 @@ export function fixBudgetInconsistency(spent: number, budget: number): { fixedSp
 }
 
 // Calcul du statut de budget
-export function getBudgetStatus(spent: number, budget: number): "under-budget" | "on-budget" | "over-budget" {
-  const percentage = (spent / budget) * 100
+export function getBudgetStatus(spent: number, budget: number): "under-budget" | "on-budget" | "over-budget" | "no-budget" {
+  // Handle edge cases
+  if (budget <= 0) {
+    return "no-budget"
+  }
   
+  const percentage = (spent / budget) * 100
+
   if (percentage < 80) return "under-budget"
   if (percentage <= 100) return "on-budget"
   return "over-budget"
@@ -521,11 +526,12 @@ export function getStatusColor(status: string): string {
 }
 
 // Fonction utilitaire pour obtenir la couleur du budget
-export function getBudgetColor(status: "under-budget" | "on-budget" | "over-budget"): string {
+export function getBudgetColor(status: "under-budget" | "on-budget" | "over-budget" | "no-budget"): string {
   const colors = {
     "under-budget": "bg-green-500/10 text-green-700 dark:text-green-400",
     "on-budget": "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-    "over-budget": "bg-red-500/10 text-red-700 dark:text-red-400"
+    "over-budget": "bg-red-500/10 text-red-700 dark:text-red-400",
+    "no-budget": "bg-gray-500/10 text-gray-700 dark:text-gray-400"
   }
   
   return colors[status]

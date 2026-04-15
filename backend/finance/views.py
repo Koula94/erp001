@@ -10,8 +10,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 from datetime import datetime
-from .models import Invoice, Expense, Budget
-from .serializers import InvoiceSerializer, ExpenseSerializer, BudgetSerializer
+from .models import Invoice, Expense, Budget, OperationRequest
+from .serializers import InvoiceSerializer, ExpenseSerializer, BudgetSerializer, OperationRequestSerializer
 
 class InvoiceViewSet(viewsets.ModelViewSet):
     queryset = Invoice.objects.all().select_related('client', 'project').order_by('-created_at')
@@ -126,8 +126,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 items_data.append([
                     item.description,
                     str(item.quantity),
-                    f"{item.unit_price:.2f} €",
-                    f"{item_total:.2f} €"
+                    f"{item.unit_price:.2f} GNF",
+                    f"{item_total:.2f} GNF"
                 ])
             
             items_table = Table(items_data, colWidths=[3*inch, 1*inch, 1.5*inch, 1.5*inch])
@@ -148,9 +148,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             
             # Totals
             totals_data = [
-                ['Sous-total:', f"{subtotal:.2f} €"],
-                ['TVA:', "0.00 €"],  # You can add tax calculation logic here
-                ['TOTAL:', f"{invoice.amount:.2f} €"]
+                ['Sous-total:', f"{subtotal:.2f} GNF"],
+                ['TVA:', "0.00 GNF"],  # You can add tax calculation logic here
+                ['TOTAL:', f"{invoice.amount:.2f} GNF"]
             ]
             
             totals_table = Table(totals_data, colWidths=[4*inch, 2*inch])
@@ -272,3 +272,166 @@ class BudgetViewSet(viewsets.ModelViewSet):
             budget_count=Count('id')
         )
         return Response(budgets_by_project)
+
+class OperationRequestViewSet(viewsets.ModelViewSet):
+    """ViewSet pour la gestion des demandes d'opération"""
+    queryset = OperationRequest.objects.all().select_related(
+        'project', 'requester', 'validated_by'
+    ).order_by('-request_date')
+    serializer_class = OperationRequestSerializer
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter, DjangoFilterBackend]
+    search_fields = ['task_name', 'reference', 'description']
+    filterset_fields = ['status', 'project', 'period']
+    ordering_fields = ['request_date', 'total_amount', 'created_at']
+    
+    def get_queryset(self):
+        """Filtre les demandes selon l'utilisateur connecté"""
+        queryset = super().get_queryset()
+        
+        # Si l'utilisateur n'est pas admin, ne montrer que ses demandes
+        if not self.request.user.is_staff:
+            queryset = queryset.filter(requester=self.request.user)
+        
+        return queryset
+    
+    @action(detail=True, methods=['post'])
+    def submit(self, request, pk=None):
+        """Soumettre une demande pour validation"""
+        operation = self.get_object()
+        
+        if operation.status != 'draft':
+            return Response(
+                {'error': 'Seules les demandes en brouillon peuvent être soumises'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validation du budget
+        budget_valid, budget_message = operation.validate_budget_availability()
+        if not budget_valid:
+            return Response(
+                {'error': f'Validation budget échouée: {budget_message}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Mise à jour du statut
+        operation.status = 'submitted'
+        operation.save()
+        
+        serializer = self.get_serializer(operation)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def validate(self, request, pk=None):
+        """Valider une demande d'opération"""
+        operation = self.get_object()
+        
+        if operation.status != 'submitted':
+            return Response(
+                {'error': 'Seules les demandes soumises peuvent être validées'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validation du budget
+        budget_valid, budget_message = operation.validate_budget_availability()
+        if not budget_valid:
+            return Response(
+                {'error': f'Validation budget échouée: {budget_message}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Mise à jour du statut
+        operation.status = 'validated'
+        operation.validated_by = request.user
+        operation.validation_date = request.data.get('validation_date')
+        operation.save()
+        
+        # Mise à jour du budget du projet si associé
+        if operation.project:
+            operation.project.spent += operation.total_amount
+            operation.project.save()
+        
+        serializer = self.get_serializer(operation)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def reject(self, request, pk=None):
+        """Rejeter une demande d'opération"""
+        operation = self.get_object()
+        
+        if operation.status not in ['draft', 'submitted']:
+            return Response(
+                {'error': 'Seules les demandes en brouillon ou soumises peuvent être rejetées'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Récupération de la raison du rejet
+        rejection_reason = request.data.get('rejection_reason', '')
+        if not rejection_reason:
+            return Response(
+                {'error': 'La raison du rejet est obligatoire'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Mise à jour du statut
+        operation.status = 'rejected'
+        operation.rejection_reason = rejection_reason
+        operation.save()
+        
+        serializer = self.get_serializer(operation)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def summary(self, request):
+        """Résumé des demandes d'opération"""
+        queryset = self.get_queryset()
+        
+        total_count = queryset.count()
+        total_amount = queryset.aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        # Par statut
+        by_status = {}
+        for status_code, status_name in OperationRequest.STATUS_CHOICES:
+            status_queryset = queryset.filter(status=status_code)
+            by_status[status_code] = {
+                'name': status_name,
+                'count': status_queryset.count(),
+                'amount': status_queryset.aggregate(total=Sum('total_amount'))['total'] or 0
+            }
+        
+        # Par période
+        by_period = {}
+        for period_code, period_name in OperationRequest.PERIOD_CHOICES:
+            period_queryset = queryset.filter(period=period_code)
+            by_period[period_code] = {
+                'name': period_name,
+                'count': period_queryset.count(),
+                'amount': period_queryset.aggregate(total=Sum('total_amount'))['total'] or 0
+            }
+        
+        return Response({
+            'total_count': total_count,
+            'total_amount': float(total_amount),
+            'by_status': by_status,
+            'by_period': by_period,
+            'average_amount': float(total_amount / total_count) if total_count > 0 else 0
+        })
+    
+    @action(detail=False, methods=['get'])
+    def my_requests(self, request):
+        """Récupérer les demandes de l'utilisateur connecté"""
+        user_requests = self.get_queryset().filter(requester=request.user)
+        serializer = self.get_serializer(user_requests, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def pending_validation(self, request):
+        """Récupérer les demandes en attente de validation"""
+        if not request.user.is_staff:
+            return Response(
+                {'error': 'Accès non autorisé'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        pending_requests = self.get_queryset().filter(status='submitted')
+        serializer = self.get_serializer(pending_requests, many=True)
+        return Response(serializer.data)

@@ -76,7 +76,7 @@ export function SystemTab() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="EUR">EUR (€)</SelectItem>
+                  <SelectItem value="EUR">EUR (GNF)</SelectItem>
                   <SelectItem value="USD">USD ($)</SelectItem>
                   <SelectItem value="GBP">GBP (£)</SelectItem>
                 </SelectContent>

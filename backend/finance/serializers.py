@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Invoice, InvoiceItem, Expense, Budget
+from .models import Invoice, InvoiceItem, Expense, Budget, OperationRequest
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
     unit_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
@@ -60,3 +60,34 @@ class BudgetSerializer(serializers.ModelSerializer):
     class Meta:
         model = Budget
         fields = '__all__'
+
+class OperationRequestSerializer(serializers.ModelSerializer):
+    project_name = serializers.CharField(source='project.name', read_only=True)
+    requester_name = serializers.CharField(source='requester.get_full_name', read_only=True)
+    validated_by_name = serializers.CharField(source='validated_by.get_full_name', read_only=True)
+    workflow_status = serializers.CharField(source='get_workflow_status', read_only=True)
+    
+    class Meta:
+        model = OperationRequest
+        fields = '__all__'
+        read_only_fields = ['reference', 'request_date', 'created_at', 'updated_at']
+    
+    def validate(self, data):
+        """Validation personnalisée pour les demandes d'opération"""
+        # Vérifier que le nom de tâche est fourni
+        if 'task_name' in data and not data['task_name'].strip():
+            raise serializers.ValidationError({"task_name": "Le nom de la tâche est obligatoire"})
+        
+        # Vérifier que le montant est positif
+        if 'total_amount' in data and data['total_amount'] <= 0:
+            raise serializers.ValidationError({"total_amount": "Le montant doit être supérieur à 0"})
+        
+        return data
+    
+    def create(self, validated_data):
+        """Création d'une demande d'opération avec l'utilisateur connecté comme demandeur"""
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            validated_data['requester'] = request.user
+        
+        return super().create(validated_data)
