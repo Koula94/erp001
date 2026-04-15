@@ -10,6 +10,7 @@ import { api } from "@/lib/api"
 import { useAuth } from "@/contexts/auth-context"
 import { CommunicationFormDialog } from "./communication-form-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Pagination, usePagination } from "@/components/ui/pagination"
 
 const typeIcons = {
   email: Mail,
@@ -43,6 +44,8 @@ export function CommunicationsTab() {
   const [typeFilter, setTypeFilter] = useState<string>("all")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 10 // Number of items per page
 
   useEffect(() => {
     loadCommunications()
@@ -71,6 +74,17 @@ export function CommunicationsTab() {
     const matchesType = typeFilter === "all" || comm.type === typeFilter
     return matchesSearch && matchesType
   })
+
+  // Apply pagination to filtered communications
+  const { paginatedData, totalPages, totalItems } = usePagination(
+    filteredCommunications,
+    currentPage,
+    pageSize
+  )
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   const handleSaveCommunication = async (communication: any) => {
     try {
@@ -146,7 +160,7 @@ export function CommunicationsTab() {
             </div>
           ) : (
             <div className="space-y-4">
-              {filteredCommunications.map((comm) => {
+              {paginatedData.map((comm) => {
                 const Icon = typeIcons[comm.type as keyof typeof typeIcons]
                 return (
                   <div key={comm.id} className="flex items-start gap-4 p-4 border rounded-lg">
@@ -173,6 +187,19 @@ export function CommunicationsTab() {
                   </div>
                 )
               })}
+            </div>
+          )}
+          
+          {/* Pagination */}
+          {filteredCommunications.length > pageSize && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                pageSize={pageSize}
+                totalItems={totalItems}
+              />
             </div>
           )}
         </CardContent>

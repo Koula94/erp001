@@ -27,6 +27,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Pagination, usePagination } from "@/components/ui/pagination"
 
 const statusColors = {
   active: "bg-green-500/10 text-green-700 dark:text-green-400",
@@ -57,6 +58,8 @@ export function ClientsTab() {
   const [deletingClientId, setDeletingClientId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 10 // Number of items per page
 
   useEffect(() => {
     loadClients()
@@ -70,8 +73,12 @@ export function ClientsTab() {
       const data = Array.isArray(response) ? response : response.results || response.data || []
       setClients(data as Client[])
       setError(null)
-    } catch (err) {
-      setError("Failed to load clients")
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.detail || 
+                          err?.response?.data?.message || 
+                          err?.message || 
+                          "Failed to load clients. Please check your connection and try again."
+      setError(errorMessage)
       console.error("Error loading clients:", err)
     } finally {
       setLoading(false)
@@ -83,6 +90,17 @@ export function ClientsTab() {
       client.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       client.email.toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  // Apply pagination to filtered clients
+  const { paginatedData, totalPages, totalItems } = usePagination(
+    filteredClients,
+    currentPage,
+    pageSize
+  )
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   const handleSaveClient = async (clientData: any) => {
     try {
@@ -110,8 +128,12 @@ export function ClientsTab() {
         setClients([...clients, newClient])
       }
       setEditingClient(null)
-    } catch (err) {
-      setError("Failed to save client")
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.detail || 
+                          err?.response?.data?.message || 
+                          err?.message || 
+                          "Failed to save client. Please check the data and try again."
+      setError(errorMessage)
       console.error("Error saving client:", err)
     }
   }
@@ -126,8 +148,12 @@ export function ClientsTab() {
       await api.clients.delete(clientId)
       setClients(clients.filter((c) => c.id !== clientId))
       setDeletingClientId(null)
-    } catch (err) {
-      setError("Failed to delete client")
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.detail || 
+                          err?.response?.data?.message || 
+                          err?.message || 
+                          "Failed to delete client. The client may be referenced by other records."
+      setError(errorMessage)
       console.error("Error deleting client:", err)
     }
   }
@@ -164,7 +190,7 @@ export function ClientsTab() {
       <Card>
         <CardHeader>
           <CardTitle>Clients</CardTitle>
-          <CardDescription>Manage your client relationships and contacts</CardDescription>
+          <CardDescription>Gérer les relations client et contact</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -179,17 +205,17 @@ export function ClientsTab() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Client Name</TableHead>
-                  <TableHead>Contact Person</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Projects</TableHead>
-                  <TableHead>Revenue</TableHead>
-                  <TableHead>Last Updated</TableHead>
+                  <TableHead>Nom du client</TableHead>
+                  <TableHead>Personne de contact</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Projets</TableHead>
+                  <TableHead>Revenu</TableHead>
+                  <TableHead>Dernière mise à jour</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredClients.map((client) => (
+                {paginatedData.map((client) => (
                   <TableRow key={client.id}>
                     <TableCell className="font-medium">{client.name}</TableCell>
                     <TableCell>{client.contact_person}</TableCell>
@@ -212,14 +238,14 @@ export function ClientsTab() {
                           <DialogContent className="max-w-2xl">
                             <DialogHeader>
                               <DialogTitle>{client.name}</DialogTitle>
-                              <DialogDescription>Client details and information</DialogDescription>
+                              <DialogDescription>Détails et informations sur le client</DialogDescription>
                             </DialogHeader>
                             <div className="space-y-6">
                               <div className="grid gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
                                   <div className="flex items-center gap-2 text-sm">
                                     <Building2 className="h-4 w-4 text-muted-foreground" />
-                                    <span className="font-medium">Contact Person:</span>
+                                    <span className="font-medium">Personne de contact:</span>
                                     <span>{client.contact_person}</span>
                                   </div>
                                   <div className="flex items-center gap-2 text-sm">
@@ -229,13 +255,13 @@ export function ClientsTab() {
                                   </div>
                                   <div className="flex items-center gap-2 text-sm">
                                     <Phone className="h-4 w-4 text-muted-foreground" />
-                                    <span className="font-medium">Phone:</span>
+                                    <span className="font-medium">Téléphone:</span>
                                     <span>{client.phone}</span>
                                   </div>
                                   <div className="flex items-start gap-2 text-sm">
                                     <MapPin className="h-4 w-4 text-muted-foreground mt-0.5" />
                                     <div>
-                                      <span className="font-medium">Address:</span>
+                                      <span className="font-medium">Adresse:</span>
                                       <p className="text-muted-foreground">{client.address}</p>
                                     </div>
                                   </div>
@@ -243,25 +269,25 @@ export function ClientsTab() {
                                 <div className="space-y-4">
                                   <Card>
                                     <CardHeader className="pb-3">
-                                      <CardTitle className="text-sm">Statistics</CardTitle>
+                                      <CardTitle className="text-sm">Statistiques</CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-2">
                                       <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Total Projects:</span>
+                                        <span className="text-muted-foreground">Total des projets:</span>
                                         <span className="font-medium">{client.total_projects}</span>
                                       </div>
                                       <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Total Revenue:</span>
+                                        <span className="text-muted-foreground">Revenu total:</span>
                                         <span className="font-medium">${parseFloat(client.total_revenue).toLocaleString()}</span>
                                       </div>
                                       <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Status:</span>
+                                        <span className="text-muted-foreground">Statut:</span>
                                         <Badge variant="outline" className={statusColors[client.status]}>
                                           {client.status}
                                         </Badge>
                                       </div>
                                       <div className="flex justify-between text-sm">
-                                        <span className="text-muted-foreground">Last Updated:</span>
+                                        <span className="text-muted-foreground">Dernière mise à jour:</span>
                                         <span className="font-medium">
                                           {new Date(client.updated_at).toLocaleDateString()}
                                         </span>
@@ -285,6 +311,19 @@ export function ClientsTab() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          
+          {/* Pagination */}
+          {filteredClients.length > pageSize && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                pageSize={pageSize}
+                totalItems={totalItems}
+              />
+            </div>
           )}
         </CardContent>
       </Card>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facture {{ invoice.invoice_number }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 20px;
+        }
+        .company-info {
+            flex: 1;
+        }
+        .invoice-info {
+            text-align: right;
+            flex: 1;
+        }
+        .invoice-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .invoice-number {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+        .client-info {
+            margin-bottom: 30px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .section-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+        .items-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        .items-table th {
+            background-color: #f5f5f5;
+            padding: 10px;
+            text-align: left;
+            border: 1px solid #ddd;
+        }
+        .items-table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        .totals {
+            margin-left: auto;
+            width: 300px;
+        }
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        .total-row.final {
+            font-weight: bold;
+            font-size: 18px;
+            border-top: 2px solid #333;
+            padding-top: 10px;
+            margin-top: 10px;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .status-draft { background-color: #f0f0f0; color: #666; }
+        .status-sent { background-color: #e3f2fd; color: #1976d2; }
+        .status-paid { background-color: #e8f5e8; color: #2e7d32; }
+        .status-overdue { background-color: #ffebee; color: #c62828; }
+        .notes {
+            margin-top: 30px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .footer {
+            margin-top: 50px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-top: 1px solid #ddd;
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="company-info">
+            <h1>Sofixe ERP</h1>
+            <p>123 Rue de l'Entreprise</p>
+            <p>75001 Paris, France</p>
+            <p>Tél: +33 1 23 45 67 89</p>
+            <p>Email: contact@sofixe.com</p>
+        </div>
+        <div class="invoice-info">
+            <div class="invoice-title">FACTURE</div>
+            <div class="invoice-number">N° {{ invoice.invoice_number }}</div>
+            <div>Date d'émission: {{ invoice.issue_date|default:"N/A" }}</div>
+            <div>Date d'échéance: {{ invoice.due_date }}</div>
+            <div class="status status-{{ invoice.status }}">{{ invoice.status|upper }}</div>
+        </div>
+    </div>
+
+    <div class="client-info">
+        <div class="section-title">CLIENT</div>
+        <div><strong>{{ invoice.client_name|default:"N/A" }}</strong></div>
+        {% if invoice.project_name %}
+        <div>Projet: {{ invoice.project_name }}</div>
+        {% endif %}
+    </div>
+
+    <table class="items-table">
+        <thead>
+            <tr>
+                <th>Description</th>
+                <th>Quantité</th>
+                <th>Prix unitaire</th>
+                <th>Total</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.description }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ item.unit_price }} GNF</td>
+                <td>{{ item.total }} GNF</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="totals">
+        <div class="total-row">
+            <span>Sous-total:</span>
+            <span>{{ subtotal|floatformat:2 }} GNF</span>
+        </div>
+        {% if tax_amount %}
+        <div class="total-row">
+            <span>TVA:</span>
+            <span>{{ tax_amount|floatformat:2 }} GNF</span>
+        </div>
+        {% endif %}
+        <div class="total-row final">
+            <span>TOTAL:</span>
+            <span>{{ total_amount|floatformat:2 }} GNF</span>
+        </div>
+    </div>
+
+    {% if invoice.notes %}
+    <div class="notes">
+        <div class="section-title">NOTES</div>
+        <p>{{ invoice.notes }}</p>
+    </div>
+    {% endif %}
+
+    <div class="footer">
+        <p>Sofixe ERP - Système de gestion d'entreprise</p>
+        <p>Cette facture a été générée automatiquement par le système Sofixe ERP</p>
+    </div>
+</body>
+</html>

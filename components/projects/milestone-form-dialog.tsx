@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,25 @@ export function MilestoneFormDialog({ open, onOpenChange, onSubmit, milestone, p
     date: milestone?.date || "",
     status: milestone?.status || "pending",
   })
+
+  // Reset form when milestone changes
+  useEffect(() => {
+    if (milestone) {
+      setFormData({
+        title: milestone.title || "",
+        description: milestone.description || "",
+        date: milestone.date || "",
+        status: milestone.status || "pending",
+      })
+    } else {
+      setFormData({
+        title: "",
+        description: "",
+        date: "",
+        status: "pending",
+      })
+    }
+  }, [milestone])
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

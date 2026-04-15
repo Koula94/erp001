@@ -2,9 +2,60 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts"
-import { revenueData } from "@/lib/mock-data"
+import { dashboardApi, RevenueData } from "@/lib/dashboard-api"
+import { useEffect, useState } from "react"
 
 export function RevenueChart() {
+  const [revenueData, setRevenueData] = useState<RevenueData[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchRevenueData() {
+      try {
+        const data = await dashboardApi.getRevenueData()
+        setRevenueData(data)
+      } catch (error) {
+        console.error('Error fetching revenue data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchRevenueData()
+  }, [])
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Revenue vs Expenses</CardTitle>
+          <CardDescription>Monthly comparison for the last 6 months</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80 flex items-center justify-center">
+            <div className="text-muted-foreground">Loading revenue data...</div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (revenueData.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Revenue vs Expenses</CardTitle>
+          <CardDescription>Monthly comparison for the last 6 months</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80 flex items-center justify-center">
+            <div className="text-muted-foreground">No revenue data available</div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <CardHeader>

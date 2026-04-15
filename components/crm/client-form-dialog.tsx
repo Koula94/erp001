@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -47,14 +47,115 @@ export function ClientFormDialog({ open, onOpenChange, client, onSave }: ClientF
     status: client?.status || "prospect",
     contactPerson: client?.contact_person || "",
   })
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Update form data when client prop changes
+  useEffect(() => {
+    if (client) {
+      setFormData({
+        name: client.name || "",
+        email: client.email || "",
+        phone: client.phone || "",
+        address: client.address || "",
+        status: client.status || "prospect",
+        contactPerson: client.contact_person || "",
+      })
+    } else {
+      // Reset form for new client
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        address: "",
+        status: "prospect",
+        contactPerson: "",
+      })
+    }
+    setErrors({})
+  }, [client])
+
+  // Validation functions
+  const validateEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+
+  const validatePhone = (phone: string): boolean => {
+    // Basic phone validation - accepts international format with +, digits, spaces, hyphens, parentheses
+    const phoneRegex = /^[\+]?[0-9\s\-\(\)]{8,20}$/
+    return phoneRegex.test(phone)
+  }
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {}
+
+    // Name validation
+    if (!formData.name.trim()) {
+      newErrors.name = "Company name is required"
+    } else if (formData.name.trim().length < 2) {
+      newErrors.name = "Company name must be at least 2 characters"
+    }
+
+    // Contact person validation
+    if (!formData.contactPerson.trim()) {
+      newErrors.contactPerson = "Contact person is required"
+    } else if (formData.contactPerson.trim().length < 2) {
+      newErrors.contactPerson = "Contact person must be at least 2 characters"
+    }
+
+    // Email validation
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required"
+    } else if (!validateEmail(formData.email)) {
+      newErrors.email = "Please enter a valid email address"
+    }
+
+    // Phone validation
+    if (!formData.phone.trim()) {
+      newErrors.phone = "Phone number is required"
+    } else if (!validatePhone(formData.phone)) {
+      newErrors.phone = "Please enter a valid phone number"
+    }
+
+    // Address validation
+    if (!formData.address.trim()) {
+      newErrors.address = "Address is required"
+    } else if (formData.address.trim().length < 5) {
+      newErrors.address = "Address must be at least 5 characters"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    onSave({
-      id: client?.id || `${Date.now()}`,
-      ...formData,
-    })
-    onOpenChange(false)
+    
+    if (!validateForm()) {
+      return
+    }
+
+    setIsSubmitting(true)
+    try {
+      await onSave({
+        id: client?.id || `${Date.now()}`,
+        ...formData,
+      })
+      onOpenChange(false)
+    } catch (error) {
+      console.error("Error saving client:", error)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: "" }))
+    }
   }
 
   return (
@@ -74,18 +175,26 @@ export function ClientFormDialog({ open, onOpenChange, client, onSave }: ClientF
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  className={errors.name ? "border-destructive" : ""}
                   required
                 />
+                {errors.name && (
+                  <p className="text-sm text-destructive">{errors.name}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="contactPerson">Contact Person *</Label>
                 <Input
                   id="contactPerson"
                   value={formData.contactPerson}
-                  onChange={(e) => setFormData({ ...formData, contactPerson: e.target.value })}
+                  onChange={(e) => handleInputChange("contactPerson", e.target.value)}
+                  className={errors.contactPerson ? "border-destructive" : ""}
                   required
                 />
+                {errors.contactPerson && (
+                  <p className="text-sm text-destructive">{errors.contactPerson}</p>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -95,18 +204,27 @@ export function ClientFormDialog({ open, onOpenChange, client, onSave }: ClientF
                   id="email"
                   type="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => handleInputChange("email", e.target.value)}
+                  className={errors.email ? "border-destructive" : ""}
                   required
                 />
+                {errors.email && (
+                  <p className="text-sm text-destructive">{errors.email}</p>
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone *</Label>
                 <Input
                   id="phone"
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) => handleInputChange("phone", e.target.value)}
+                  className={errors.phone ? "border-destructive" : ""}
+                  placeholder="+33 1 23 45 67 89"
                   required
                 />
+                {errors.phone && (
+                  <p className="text-sm text-destructive">{errors.phone}</p>
+                )}
               </div>
             </div>
             <div className="space-y-2">
@@ -114,15 +232,20 @@ export function ClientFormDialog({ open, onOpenChange, client, onSave }: ClientF
               <Textarea
                 id="address"
                 value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                onChange={(e) => handleInputChange("address", e.target.value)}
+                className={errors.address ? "border-destructive" : ""}
+                placeholder="123 Street, City, Country"
                 required
               />
+              {errors.address && (
+                <p className="text-sm text-destructive">{errors.address}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="status">Status</Label>
               <Select
                 value={formData.status}
-                onValueChange={(value: any) => setFormData({ ...formData, status: value })}
+                onValueChange={(value: any) => handleInputChange("status", value)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -139,7 +262,9 @@ export function ClientFormDialog({ open, onOpenChange, client, onSave }: ClientF
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">{client ? "Update Client" : "Add Client"}</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Saving..." : client ? "Update Client" : "Add Client"}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

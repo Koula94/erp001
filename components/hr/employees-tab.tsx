@@ -247,7 +247,7 @@ export function EmployeesTab() {
                                       <span className="text-muted-foreground">Performance:</span>
                                       <div className="flex items-center gap-1">
                                         <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                                        <span className="font-medium">{employee.performance_rating || "N/A"}</span>
+                                        <span className="font-medium">{employee.performance_rating}</span>
                                       </div>
                                     </div>
                                   </CardContent>

@@ -50,13 +50,37 @@ class ApiClient {
     })
 
     if (!response.ok) {
-      let errorMessage = await response.text()
+      let errorMessage = `HTTP ${response.status} error`
       try {
-        // Try to parse as JSON for structured error messages
-        const errorData = JSON.parse(errorMessage)
-        errorMessage = errorData.detail || errorData.message || errorMessage
+        const rawText = await response.text()
+        if (rawText) {
+          try {
+            // Try to parse as JSON for structured error messages
+            const errorData = JSON.parse(rawText)
+            if (errorData.detail) {
+              // Standard DRF error format: { "detail": "..." }
+              errorMessage = errorData.detail
+            } else if (errorData.message) {
+              errorMessage = errorData.message
+            } else if (typeof errorData === 'object' && !Array.isArray(errorData)) {
+              // DRF field validation errors: { "field": ["error1", "error2"], ... }
+              const fieldErrors = Object.entries(errorData)
+                .map(([field, errors]) => {
+                  const msgs = Array.isArray(errors) ? errors.join(', ') : String(errors)
+                  return field === 'non_field_errors' ? msgs : `${field}: ${msgs}`
+                })
+                .join(' | ')
+              errorMessage = fieldErrors || rawText
+            } else {
+              errorMessage = rawText
+            }
+          } catch {
+            // Not JSON – use the raw text
+            errorMessage = rawText
+          }
+        }
       } catch {
-        // If not JSON, use the text as is
+        // response.text() failed
       }
       
       const error: ApiError = {
@@ -66,7 +90,14 @@ class ApiClient {
       throw error
     }
 
-    return response.json()
+    // Handle empty responses (like for DELETE operations)
+    const contentType = response.headers.get("content-type")
+    if (contentType && contentType.includes("application/json")) {
+      return response.json()
+    } else {
+      // For empty responses, return an empty object
+      return {} as T
+    }
   }
 
   async get<T>(endpoint: string): Promise<T> {
@@ -154,14 +185,16 @@ class ApiClient {
   }
 
   tasks = {
-    list: () => this.get("/projects/tasks/"),
+    list: (query?: string) => this.get(`/projects/tasks/${query ? `?${query}` : ""}`),
+    get: (id: string) => this.get(`/projects/tasks/${id}/`),
     create: (data: any) => this.post("/projects/tasks/", data),
     update: (id: string, data: any) => this.put(`/projects/tasks/${id}/`, data),
     delete: (id: string) => this.delete(`/projects/tasks/${id}/`),
   }
 
   milestones = {
-    list: () => this.get("/projects/milestones/"),
+    list: (query?: string) => this.get(`/projects/milestones/${query ? `?${query}` : ""}`),
+    get: (id: string) => this.get(`/projects/milestones/${id}/`),
     create: (data: any) => this.post("/projects/milestones/", data),
     update: (id: string, data: any) => this.put(`/projects/milestones/${id}/`, data),
     delete: (id: string) => this.delete(`/projects/milestones/${id}/`),
@@ -198,6 +231,7 @@ class ApiClient {
     create: (data: any) => this.post("/stock/materials/", data),
     update: (id: string, data: any) => this.put(`/stock/materials/${id}/`, data),
     delete: (id: string) => this.delete(`/stock/materials/${id}/`),
+    recalculateStatuses: () => this.post("/stock/materials/recalculate_statuses/", {}),
   }
 
   equipment = {
@@ -222,9 +256,12 @@ class ApiClient {
   // Finance
   invoices = {
     list: () => this.get("/finance/invoices/"),
+    get: (id: string) => this.get(`/finance/invoices/${id}/`),
     create: (data: any) => this.post("/finance/invoices/", data),
     update: (id: string, data: any) => this.put(`/finance/invoices/${id}/`, data),
     delete: (id: string) => this.delete(`/finance/invoices/${id}/`),
+    downloadPdf: (id: string) => this.get(`/finance/invoices/${id}/download_pdf/`),
+    preview: (id: string) => this.get(`/finance/invoices/${id}/preview/`),
   }
 
   expenses = {
@@ -239,12 +276,27 @@ class ApiClient {
     update: (id: string, data: any) => this.put(`/finance/budgets/${id}/`, data),
   }
 
+  operations = {
+    list: () => this.get("/finance/operation-requests/"),
+    get: (id: string) => this.get(`/finance/operation-requests/${id}/`),
+    create: (data: any) => this.post("/finance/operation-requests/", data),
+    update: (id: string, data: any) => this.put(`/finance/operation-requests/${id}/`, data),
+    delete: (id: string) => this.delete(`/finance/operation-requests/${id}/`),
+    submit: (id: string) => this.post(`/finance/operation-requests/${id}/submit/`, {}),
+    validate: (id: string, data?: any) => this.post(`/finance/operation-requests/${id}/validate/`, data || {}),
+    reject: (id: string, data: any) => this.post(`/finance/operation-requests/${id}/reject/`, data),
+    summary: () => this.get("/finance/operation-requests/summary/"),
+    myRequests: () => this.get("/finance/operation-requests/my_requests/"),
+    pendingValidation: () => this.get("/finance/operation-requests/pending_validation/"),
+  }
+
   // Users
   users = {
     list: () => this.get("/users/"),
     get: (id: string) => this.get(`/users/${id}/`),
     create: (data: any) => this.post("/users/", data),
-    update: (id: string, data: any) => this.put(`/users/${id}/`, data),
+    // Use PATCH for partial update — avoids "is_active: This field is required" DRF error
+    update: (id: string, data: any) => this.patch(`/users/${id}/`, data),
     delete: (id: string) => this.delete(`/users/${id}/`),
   }
 }

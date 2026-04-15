@@ -22,9 +22,10 @@ interface EquipmentFormDialogProps {
   onOpenChange: (open: boolean) => void
   onSubmit: (data: any) => void
   initialData?: any
+  projects?: any[]
 }
 
-export function EquipmentFormDialog({ open, onOpenChange, onSubmit, initialData }: EquipmentFormDialogProps) {
+export function EquipmentFormDialog({ open, onOpenChange, onSubmit, initialData, projects = [] }: EquipmentFormDialogProps) {
   const [formData, setFormData] = useState(
     initialData || {
       name: "",
@@ -34,16 +35,59 @@ export function EquipmentFormDialog({ open, onOpenChange, onSubmit, initialData 
       location: "",
       value: 0,
       assignedProject: "",
+      purchaseDate: new Date().toISOString().split("T")[0],
       lastMaintenance: new Date().toISOString().split("T")[0],
       nextMaintenance: "",
       notes: "",
     },
   )
+  const [errors, setErrors] = useState<Record<string, string>>({})
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {}
+
+    // Required fields validation
+    if (!formData.name.trim()) newErrors.name = "Equipment name is required"
+    if (!formData.category) newErrors.category = "Category is required"
+    if (!formData.location.trim()) newErrors.location = "Location is required"
+
+    // Numeric validation
+    if (formData.value < 0) newErrors.value = "Value cannot be negative"
+
+    // Date validation
+    const today = new Date()
+    const purchaseDate = new Date(formData.purchaseDate)
+    const lastMaintenanceDate = new Date(formData.lastMaintenance)
+    const nextMaintenanceDate = formData.nextMaintenance ? new Date(formData.nextMaintenance) : null
+
+    if (purchaseDate > today) {
+      newErrors.purchaseDate = "Purchase date cannot be in the future"
+    }
+    if (lastMaintenanceDate > today) {
+      newErrors.lastMaintenance = "Last maintenance date cannot be in the future"
+    }
+    if (nextMaintenanceDate && nextMaintenanceDate < today) {
+      newErrors.nextMaintenance = "Next maintenance date cannot be in the past"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    onSubmit(formData)
-    onOpenChange(false)
+    if (validateForm()) {
+      onSubmit(formData)
+      onOpenChange(false)
+    }
+  }
+
+  const handleInputChange = (field: string, value: any) => {
+    setFormData({ ...formData, [field]: value })
+    // Clear error when user starts typing
+    if (errors[field]) {
+      setErrors({ ...errors, [field]: "" })
+    }
   }
 
   return (
@@ -63,17 +107,19 @@ export function EquipmentFormDialog({ open, onOpenChange, onSubmit, initialData 
                 <Input
                   id="name"
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
+                  className={errors.name ? "border-red-500" : ""}
                   required
                 />
+                {errors.name && <p className="text-sm text-red-500">{errors.name}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="category">Category *</Label>
                 <Select
                   value={formData.category}
-                  onValueChange={(value) => setFormData({ ...formData, category: value })}
+                  onValueChange={(value) => handleInputChange("category", value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className={errors.category ? "border-red-500" : ""}>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -83,6 +129,7 @@ export function EquipmentFormDialog({ open, onOpenChange, onSubmit, initialData 
                     <SelectItem value="Safety Equipment">Safety Equipment</SelectItem>
                   </SelectContent>
                 </Select>
+                {errors.category && <p className="text-sm text-red-500">{errors.category}</p>}
               </div>
             </div>
 
@@ -126,9 +173,11 @@ export function EquipmentFormDialog({ open, onOpenChange, onSubmit, initialData 
                 <Input
                   id="location"
                   value={formData.location}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                  onChange={(e) => handleInputChange("location", e.target.value)}
+                  className={errors.location ? "border-red-500" : ""}
                   required
                 />
+                {errors.location && <p className="text-sm text-red-500">{errors.location}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="value">Value ($) *</Label>
@@ -136,43 +185,76 @@ export function EquipmentFormDialog({ open, onOpenChange, onSubmit, initialData 
                   id="value"
                   type="number"
                   value={formData.value}
-                  onChange={(e) => setFormData({ ...formData, value: Number(e.target.value) })}
+                  onChange={(e) => handleInputChange("value", Number(e.target.value))}
+                  className={errors.value ? "border-red-500" : ""}
                   required
                 />
+                {errors.value && <p className="text-sm text-red-500">{errors.value}</p>}
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="assignedProject">Assigned Project</Label>
-              <Input
-                id="assignedProject"
+              <Select
                 value={formData.assignedProject}
-                onChange={(e) => setFormData({ ...formData, assignedProject: e.target.value })}
-                placeholder="Leave empty if not assigned"
-              />
+                onValueChange={(value) => setFormData({ ...formData, assignedProject: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select project (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="not-assigned">Not assigned</SelectItem>
+                  {projects.length === 0 ? (
+                    <SelectItem value="no-projects" disabled>No projects available</SelectItem>
+                  ) : (
+                    projects.map((project) => (
+                      <SelectItem key={project.id} value={project.name}>
+                        {project.name} ({project.status})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="purchaseDate">Purchase Date *</Label>
+                <Input
+                  id="purchaseDate"
+                  type="date"
+                  value={formData.purchaseDate}
+                  onChange={(e) => handleInputChange("purchaseDate", e.target.value)}
+                  className={errors.purchaseDate ? "border-red-500" : ""}
+                  required
+                />
+                {errors.purchaseDate && <p className="text-sm text-red-500">{errors.purchaseDate}</p>}
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="lastMaintenance">Last Maintenance *</Label>
                 <Input
                   id="lastMaintenance"
                   type="date"
                   value={formData.lastMaintenance}
-                  onChange={(e) => setFormData({ ...formData, lastMaintenance: e.target.value })}
+                  onChange={(e) => handleInputChange("lastMaintenance", e.target.value)}
+                  className={errors.lastMaintenance ? "border-red-500" : ""}
                   required
                 />
+                {errors.lastMaintenance && <p className="text-sm text-red-500">{errors.lastMaintenance}</p>}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="nextMaintenance">Next Maintenance *</Label>
-                <Input
-                  id="nextMaintenance"
-                  type="date"
-                  value={formData.nextMaintenance}
-                  onChange={(e) => setFormData({ ...formData, nextMaintenance: e.target.value })}
-                  required
-                />
-              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="nextMaintenance">Next Maintenance *</Label>
+              <Input
+                id="nextMaintenance"
+                type="date"
+                value={formData.nextMaintenance}
+                onChange={(e) => handleInputChange("nextMaintenance", e.target.value)}
+                className={errors.nextMaintenance ? "border-red-500" : ""}
+                required
+              />
+              {errors.nextMaintenance && <p className="text-sm text-red-500">{errors.nextMaintenance}</p>}
             </div>
 
             <div className="space-y-2">

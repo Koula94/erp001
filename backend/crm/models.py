@@ -19,6 +19,22 @@ class Client(models.Model):
     
     def __str__(self):
         return self.name
+    
+    @property
+    def total_projects(self):
+        """Calculate total projects for this client"""
+        from projects.models import Project
+        return Project.objects.filter(client=self).count()
+    
+    @property
+    def total_revenue(self):
+        """Calculate total revenue from approved quotes for this client"""
+        from finance.models import Invoice
+        total = Invoice.objects.filter(
+            client=self,
+            status='paid'
+        ).aggregate(total=models.Sum('amount'))['total']
+        return total or 0
 
 class Quote(models.Model):
     STATUS_CHOICES = [

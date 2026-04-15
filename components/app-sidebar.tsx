@@ -49,31 +49,31 @@ const navigationItems = [
   {
     title: "CRM",
     icon: Users,
-    href: "/dashboard/crm",
+    href: "/crm",
     permission: "crm",
   },
   {
     title: "Projects",
     icon: FolderKanban,
-    href: "/dashboard/projects",
+    href: "/projects",
     permission: "projects",
   },
   {
     title: "HR",
     icon: UserCog,
-    href: "/dashboard/hr",
+    href: "/hr",
     permission: "hr",
   },
   {
     title: "Stock",
     icon: Package,
-    href: "/dashboard/stock",
+    href: "/stock",
     permission: "stock",
   },
   {
     title: "Finance",
     icon: DollarSign,
-    href: "/dashboard/finance",
+    href: "/finance",
     permission: "finance",
   },
 ]
@@ -152,8 +152,8 @@ function SidebarContentWrapper() {
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
-                  <SidebarMenuButton asChild isActive={pathname === "/dashboard/settings"}>
-                    <Link href="/dashboard/settings" onClick={handleNavClick}>
+                  <SidebarMenuButton asChild isActive={pathname === "/settings"}>
+                    <Link href="/settings" onClick={handleNavClick}>
                       <Settings className="h-4 w-4" />
                       <span>Settings</span>
                     </Link>

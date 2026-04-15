@@ -32,8 +32,8 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData }:
       amount: 0,
       date: new Date().toISOString().split("T")[0],
       project: "",
-      vendor: "",
-      status: "pending",
+      priority: "medium",
+      status: "draft",
       notes: "",
     },
   )
@@ -48,9 +48,9 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData }:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{initialData ? "Edit Expense" : "Record New Expense"}</DialogTitle>
+          <DialogTitle>{initialData ? "Modifier la dépense" : "Nouvelle Dépense"}</DialogTitle>
           <DialogDescription>
-            {initialData ? "Update expense information" : "Record a new business expense"}
+            {initialData ? "Mettre à jour les informations de la dépense" : "Enregistrer une nouvelle dépense de projet"}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -62,32 +62,34 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData }:
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                 required
+                placeholder="Description détaillée de la dépense"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="category">Category *</Label>
+                <Label htmlFor="category">Catégorie *</Label>
                 <Select
                   value={formData.category}
                   onValueChange={(value) => setFormData({ ...formData, category: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder="Sélectionner une catégorie" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Materials">Materials</SelectItem>
-                    <SelectItem value="Labor">Labor</SelectItem>
-                    <SelectItem value="Equipment">Equipment</SelectItem>
-                    <SelectItem value="Transportation">Transportation</SelectItem>
-                    <SelectItem value="Utilities">Utilities</SelectItem>
-                    <SelectItem value="Office">Office</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
+                    <SelectItem value="materials">Matériaux</SelectItem>
+                    <SelectItem value="labor">Main d'œuvre</SelectItem>
+                    <SelectItem value="equipment">Équipement</SelectItem>
+                    <SelectItem value="transport">Transport</SelectItem>
+                    <SelectItem value="utilities">Services</SelectItem>
+                    <SelectItem value="consulting">Consulting</SelectItem>
+                    <SelectItem value="software">Logiciels</SelectItem>
+                    <SelectItem value="other">Autre</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount ($) *</Label>
+                <Label htmlFor="amount">Montant ($) *</Label>
                 <Input
                   id="amount"
                   type="number"
@@ -95,6 +97,7 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData }:
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
                   required
+                  placeholder="0.00"
                 />
               </div>
             </div>
@@ -111,15 +114,16 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData }:
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="status">Status *</Label>
-                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                <Label htmlFor="priority">Priorité *</Label>
+                <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value="approved">Approved</SelectItem>
-                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="low">Faible</SelectItem>
+                    <SelectItem value="medium">Moyenne</SelectItem>
+                    <SelectItem value="high">Haute</SelectItem>
+                    <SelectItem value="urgent">Urgente</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -127,22 +131,29 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData }:
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="project">Project</Label>
+                <Label htmlFor="project">Projet</Label>
                 <Input
                   id="project"
                   value={formData.project}
                   onChange={(e) => setFormData({ ...formData, project: e.target.value })}
-                  placeholder="Associated project (optional)"
+                  placeholder="Projet associé (optionnel)"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="vendor">Vendor</Label>
-                <Input
-                  id="vendor"
-                  value={formData.vendor}
-                  onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
-                  placeholder="Vendor name (optional)"
-                />
+                <Label htmlFor="status">Statut *</Label>
+                <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Brouillon</SelectItem>
+                    <SelectItem value="submitted">Soumis</SelectItem>
+                    <SelectItem value="under_review">En révision</SelectItem>
+                    <SelectItem value="approved">Approuvé</SelectItem>
+                    <SelectItem value="rejected">Rejeté</SelectItem>
+                    <SelectItem value="paid">Payé</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -152,16 +163,16 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData }:
                 id="notes"
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Additional details about this expense"
+                placeholder="Notes internes pour le traitement de la dépense"
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              Annuler
             </Button>
-            <Button type="submit">{initialData ? "Update" : "Record"} Expense</Button>
+            <Button type="submit">{initialData ? "Mettre à jour" : "Enregistrer"} la dépense</Button>
           </DialogFooter>
         </form>
       </DialogContent>

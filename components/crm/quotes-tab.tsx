@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog"
 import { QuoteFormDialog } from "./quote-form-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Pagination, usePagination } from "@/components/ui/pagination"
 
 const statusColors = {
   pending: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
@@ -54,6 +55,8 @@ export function QuotesTab() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 10 // Number of items per page
 
   useEffect(() => {
     loadQuotes()
@@ -81,6 +84,17 @@ export function QuotesTab() {
       quote.client_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       quote.project_name.toLowerCase().includes(searchQuery.toLowerCase()),
   )
+
+  // Apply pagination to filtered quotes
+  const { paginatedData, totalPages, totalItems } = usePagination(
+    filteredQuotes,
+    currentPage,
+    pageSize
+  )
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   const handleSaveQuote = async (quote: any) => {
     try {
@@ -212,7 +226,7 @@ export function QuotesTab() {
       <Card>
         <CardHeader>
           <CardTitle>Quotes</CardTitle>
-          <CardDescription>Manage project quotes and proposals</CardDescription>
+          <CardDescription>Gérer les devis et les propositions de projets</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -229,15 +243,15 @@ export function QuotesTab() {
                 <TableRow>
                   <TableHead>Quote ID</TableHead>
                   <TableHead>Client</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Valid Until</TableHead>
+                  <TableHead>Projet</TableHead>
+                  <TableHead>Montant</TableHead>
+                  <TableHead>Statut</TableHead>
+                  <TableHead>Valable jusqu'au</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredQuotes.map((quote) => (
+                {paginatedData.map((quote) => (
                   <TableRow key={quote.id}>
                     <TableCell className="font-medium">{quote.id}</TableCell>
                     <TableCell>{quote.client_name}</TableCell>
@@ -254,12 +268,12 @@ export function QuotesTab() {
                         <Dialog>
                           <DialogTrigger asChild>
                             <Button variant="ghost" size="sm">
-                              View
+                              Voir
                             </Button>
                           </DialogTrigger>
                           <DialogContent className="max-w-3xl">
                             <DialogHeader>
-                              <DialogTitle>Quote Details - {quote.id}</DialogTitle>
+                              <DialogTitle>Détails du devis - {quote.id}</DialogTitle>
                               <DialogDescription>{quote.project_name}</DialogDescription>
                             </DialogHeader>
                             <div className="space-y-6">
@@ -269,35 +283,35 @@ export function QuotesTab() {
                                     <span className="font-medium">Client:</span> {quote.client_name}
                                   </div>
                                   <div className="text-sm">
-                                    <span className="font-medium">Created:</span>{" "}
+                                    <span className="font-medium">Créé:</span>{" "}
                                     {new Date(quote.created_at).toLocaleDateString()}
                                   </div>
                                   <div className="text-sm">
-                                    <span className="font-medium">Valid Until:</span>{" "}
+                                    <span className="font-medium">Valable jusqu'au:</span>{" "}
                                     {new Date(quote.valid_until).toLocaleDateString()}
                                   </div>
                                 </div>
                                 <div className="space-y-2">
                                   <div className="text-sm">
-                                    <span className="font-medium">Status:</span>{" "}
+                                    <span className="font-medium">Statut:</span>{" "}
                                     <Badge variant="outline" className={statusColors[quote.status]}>
                                       {quote.status}
                                     </Badge>
                                   </div>
                                   <div className="text-sm">
-                                    <span className="font-medium">Total Amount:</span> ${parseFloat(quote.amount).toLocaleString()}
+                                    <span className="font-medium">Montant Total:</span> ${parseFloat(quote.amount).toLocaleString()}
                                   </div>
                                 </div>
                               </div>
 
                               <div>
-                                <h4 className="font-medium mb-3">Quote Items</h4>
+                                <h4 className="font-medium mb-3">Articles de devis</h4>
                                 <Table>
                                   <TableHeader>
                                     <TableRow>
                                       <TableHead>Description</TableHead>
-                                      <TableHead>Quantity</TableHead>
-                                      <TableHead>Unit Price</TableHead>
+                                      <TableHead>Quantité</TableHead>
+                                      <TableHead>Prix ​​unitaire</TableHead>
                                       <TableHead>Total</TableHead>
                                     </TableRow>
                                   </TableHeader>
@@ -325,21 +339,21 @@ export function QuotesTab() {
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm">
-                              Update Status
+                              Mettre à jour
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent>
                             <DropdownMenuItem onClick={() => handleUpdateStatus(quote.id, "pending")}>
                               <FileText className="mr-2 h-4 w-4" />
-                              Pending
+                              En attente
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleUpdateStatus(quote.id, "approved")}>
                               <CheckCircle className="mr-2 h-4 w-4" />
-                              Approve
+                              Approuver
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleUpdateStatus(quote.id, "rejected")}>
                               <XCircle className="mr-2 h-4 w-4" />
-                              Reject
+                              Rejeter
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -349,6 +363,19 @@ export function QuotesTab() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          
+          {/* Pagination */}
+          {filteredQuotes.length > pageSize && (
+            <div className="mt-6">
+              <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={handlePageChange}
+                pageSize={pageSize}
+                totalItems={totalItems}
+              />
+            </div>
           )}
         </CardContent>
       </Card>

@@ -2,9 +2,60 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts"
-import { projectStatusData } from "@/lib/mock-data"
+import { dashboardApi, ProjectStatusData } from "@/lib/dashboard-api"
+import { useEffect, useState } from "react"
 
 export function ProjectStatusChart() {
+  const [projectStatusData, setProjectStatusData] = useState<ProjectStatusData[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchProjectStatusData() {
+      try {
+        const data = await dashboardApi.getProjectStatusData()
+        setProjectStatusData(data)
+      } catch (error) {
+        console.error('Error fetching project status data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProjectStatusData()
+  }, [])
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Project Status</CardTitle>
+          <CardDescription>Current distribution of all projects</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80 flex items-center justify-center">
+            <div className="text-muted-foreground">Loading project status data...</div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (projectStatusData.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Project Status</CardTitle>
+          <CardDescription>Current distribution of all projects</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="h-80 flex items-center justify-center">
+            <div className="text-muted-foreground">No project data available</div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card>
       <CardHeader>
