@@ -43,7 +43,6 @@ class Expense(models.Model):
         ('under_review', 'En révision'),
         ('approved', 'Approuvé'),
         ('rejected', 'Rejeté'),
-        ('paid', 'Payé'),
     ]
     
     CATEGORY_CHOICES = [
@@ -54,7 +53,7 @@ class Expense(models.Model):
         ('utilities', 'Services'),
         ('consulting', 'Consulting'),
         ('software', 'Logiciels'),
-        ('other', 'Autre'),
+        ('other', 'Autre'), 
     ]
     
     PRIORITY_CHOICES = [
@@ -66,6 +65,8 @@ class Expense(models.Model):
     
     project = models.ForeignKey(Project, on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES)
+    subcategory = models.CharField(max_length=100, blank=True, help_text="Sous-catégorie optionnelle (ex: 'Papeterie' pour Matériaux)")
+    subcategories = models.JSONField(default=list, blank=True, help_text="Liste JSON des sous-catégories avec montants")
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     description = models.TextField()
     date = models.DateField()
@@ -77,6 +78,28 @@ class Expense(models.Model):
     receipt = models.FileField(upload_to='receipts/', null=True, blank=True)
     notes = models.TextField(blank=True, help_text="Notes internes pour le traitement")
     payment_date = models.DateField(null=True, blank=True)
+    # Champs pour la gestion de la caisse
+    fund_source = models.CharField(
+        max_length=50, 
+        blank=True, 
+        choices=[
+            ('project_budget', 'Budget projet'),
+            ('operation_cash', 'Caisse opérations'),
+            ('emergency_fund', 'Fonds d\'urgence'),
+            ('other', 'Autre'),
+        ],
+        default='project_budget',
+        verbose_name="Source du fonds"
+    )
+    linked_disbursement = models.ForeignKey(
+        'self', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='linked_expenses',
+        verbose_name="Décaissement lié"
+    )
+    cash_withdrawal_date = models.DateField(null=True, blank=True, verbose_name="Date de prélèvement caisse")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -86,12 +109,12 @@ class Expense(models.Model):
     @property
     def is_approved(self):
         """Vérifie si la dépense est approuvée"""
-        return self.status in ['approved', 'paid']
+        return self.status == 'approved'
     
     @property
     def is_paid(self):
         """Vérifie si la dépense est payée"""
-        return self.status == 'paid'
+        return False  # Le statut 'paid' n'existe plus pour les dépenses
     
     @property
     def days_since_submission(self):
@@ -115,40 +138,42 @@ class Expense(models.Model):
             'draft': 'Brouillon',
             'submitted': 'Soumis pour approbation',
             'under_review': 'En cours de révision',
-            'approved': 'Approuvé - En attente de paiement',
-            'rejected': 'Rejeté',
-            'paid': 'Payé'
+            'approved': 'Approuvé',
+            'rejected': 'Rejeté'
         }
         return workflow.get(self.status, self.status)
+
+
+class OperationSubcategory(models.Model):
+    """
+    Modèle pour stocker les sous-catégories avec leurs montants pour chaque demande d'opération.
+    Permet une meilleure gestion et reporting des dépenses par sous-catégorie.
+    """
+    operation_request = models.ForeignKey(
+        'OperationRequest', 
+        on_delete=models.CASCADE, 
+        related_name='subcategories',
+        verbose_name="Demande d'opération"
+    )
+    name = models.CharField(
+        max_length=100, 
+        verbose_name="Nom de la sous-catégorie"
+    )
+    amount = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        verbose_name="Montant (GNF)"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
-    def validate_budget_availability(self):
-        """Valide si le budget du projet permet cette dépense"""
-        if not self.project:
-            return True, "Aucun projet associé"
-        
-        # Calculer le budget restant du projet
-        project_budget = self.project.budget
-        project_spent = self.project.spent
-        
-        remaining_budget = project_budget - project_spent
-        
-        if self.amount > remaining_budget:
-            return False, f"Budget insuffisant. Restant: {remaining_budget}, Dépense: {self.amount}"
-        
-        return True, f"Budget suffisant. Restant: {remaining_budget}"
+    class Meta:
+        verbose_name = "Sous-catégorie d'opération"
+        verbose_name_plural = "Sous-catégories d'opération"
+        ordering = ['created_at']
     
-    def save(self, *args, **kwargs):
-        """Override save pour gérer les transitions de statut"""
-        # Logique de validation avant sauvegarde
-        if self.status == 'approved' and not self.approved_by:
-            # Ne peut pas être approuvé sans approbateur
-            self.status = 'under_review'
-        
-        if self.status == 'paid' and not self.payment_date:
-            from django.utils import timezone
-            self.payment_date = timezone.now().date()
-        
-        super().save(*args, **kwargs)
+    def __str__(self):
+        return f"{self.name} - {self.amount} GNF (Opération: {self.operation_request.reference})"
 
 class Budget(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='budgets', null=True, blank=True)
@@ -205,6 +230,20 @@ class OperationRequest(models.Model):
     payment_proof = models.FileField(upload_to='payment_proofs/%Y/%m/%d/', null=True, blank=True, verbose_name="Justificatif de paiement")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    # NOUVEAUX CHAMPS : Catégories budgétaires et sous-catégories
+    category = models.CharField(
+        max_length=200, 
+        blank=True,
+        verbose_name="Catégorie(s) budgétaire(s)",
+        help_text="Catégories séparées par des virgules (ex: 'materials,labor,equipment')"
+    )
+    subcategory = models.CharField(
+        max_length=100, 
+        blank=True, 
+        verbose_name="Sous-catégorie",
+        help_text="Sous-catégorie optionnelle (ex: 'Papeterie' pour Matériaux)"
+    )
     
     class Meta:
         verbose_name = "Demande d'opération"
@@ -272,9 +311,38 @@ class OperationRequest(models.Model):
         remaining_budget = project_budget - project_spent
         
         if self.total_amount > remaining_budget:
-            return False, f"Budget insuffisant. Restant: {remaining_budget}, Opération: {self.total_amount}"
+            # Calculer le déficit
+            deficit = self.total_amount - remaining_budget
+            
+            # Créer un message d'erreur détaillé avec suggestions
+            error_message = (
+                f"Budget insuffisant pour cette opération.\n\n"
+                f"📊 **Détails du budget :**\n"
+                f"• Budget total du projet : {project_budget:,.2f} GNF\n"
+                f"• Budget déjà dépensé : {project_spent:,.2f} GNF\n"
+                f"• Budget restant disponible : {remaining_budget:,.2f} GNF\n"
+                f"• Montant de l'opération : {self.total_amount:,.2f} GNF\n"
+                f"• Déficit : {deficit:,.2f} GNF\n\n"
+                f"💡 **Suggestions :**\n"
+                f"1. Réduire le montant de l'opération à {remaining_budget:,.2f} GNF ou moins\n"
+                f"2. Augmenter le budget du projet de {deficit:,.2f} GNF\n"
+                f"3. Diviser l'opération en plusieurs parties\n"
+                f"4. Utiliser un autre projet avec budget suffisant"
+            )
+            return False, error_message
         
-        return True, f"Budget suffisant. Restant: {remaining_budget}"
+        # Calculer le pourcentage d'utilisation
+        budget_usage_percentage = (self.total_amount / remaining_budget * 100) if remaining_budget > 0 else 0
+        
+        success_message = (
+            f"Budget suffisant pour cette opération.\n\n"
+            f"📊 **Détails du budget :**\n"
+            f"• Budget restant disponible : {remaining_budget:,.2f} GNF\n"
+            f"• Montant de l'opération : {self.total_amount:,.2f} GNF\n"
+            f"• Budget restant après opération : {remaining_budget - self.total_amount:,.2f} GNF\n"
+            f"• Utilisation du budget restant : {budget_usage_percentage:.1f}%"
+        )
+        return True, success_message
     
     def get_workflow_status(self):
         """Retourne le statut du workflow"""

@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Plus, Search, FileText, Edit, Trash2, Loader2, CheckCircle, XCircle, Send, CreditCard, Paperclip } from "lucide-react"
+import { Plus, Search, FileText, Edit, Trash2, Loader2, CheckCircle, XCircle, Send, CreditCard, Paperclip, Eye } from "lucide-react"
 import { api } from "@/lib/api"
+import { getCategoryName, getCategoryColor } from "@/lib/categories"
 import { OperationFormDialog } from "./operation-form-dialog"
+import { OperationDetailDialog, type Operation } from "./operation-detail-dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,6 +54,11 @@ interface OperationRequest {
   validated_by?: { id: string; name: string }
   validation_date?: string
   rejection_reason?: string
+  payment_proof?: string
+  payment_proof_url?: string
+  category?: string
+  subcategory?: string
+  subcategories?: Array<{ name: string; amount: number }>
   created_at: string
   updated_at: string
 }
@@ -62,6 +69,8 @@ export function OperationsTab() {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingOperation, setEditingOperation] = useState<OperationRequest | null>(null)
   const [deletingOperationId, setDeletingOperationId] = useState<string | null>(null)
+  const [selectedOperation, setSelectedOperation] = useState<OperationRequest | null>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -238,6 +247,36 @@ export function OperationsTab() {
     }).format(amount)
   }
 
+  // Convert OperationRequest to Operation for the detail dialog
+  const convertToOperation = (op: OperationRequest | null): Operation | null => {
+    if (!op) return null
+    
+    return {
+      id: op.id,
+      reference: op.reference,
+      status: op.status,
+      created_at: op.created_at,
+      updated_at: op.updated_at,
+      task_name: op.task_name,
+      period: op.period,
+      requester: op.requester,
+      validated_by: op.validated_by,
+      validation_date: op.validation_date,
+      rejection_reason: op.rejection_reason,
+      payment_proof_url: op.payment_proof_url,
+      // Convert payment_proof string to boolean (true if payment_proof_url exists)
+      payment_proof: !!op.payment_proof_url,
+      project: op.project,
+      project_name: op.project_name,
+      category: '', // Not present in OperationRequest
+      categories: null,
+      total_amount: Number(op.total_amount),
+      description: op.description,
+      subcategory: '', // Not present in OperationRequest
+      subcategories: null
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-4">
@@ -289,6 +328,7 @@ export function OperationsTab() {
                 <TableRow>
                   <TableHead>Référence</TableHead>
                   <TableHead>Tâche</TableHead>
+                
                   <TableHead>Montant</TableHead>
                   <TableHead>Période</TableHead>
                   <TableHead>Date demande</TableHead>
@@ -306,6 +346,8 @@ export function OperationsTab() {
                     <TableCell className="font-medium max-w-xs truncate">
                       {operation.task_name}
                     </TableCell>
+                    
+                  
                     <TableCell className="font-semibold">
                       {formatCurrency(operation.total_amount)}
                     </TableCell>
@@ -320,7 +362,7 @@ export function OperationsTab() {
                         {operation.project_name || operation.project?.name || "Sans objet"}
                       </Badge>
                     </TableCell>
-                      <TableCell>
+                    <TableCell>
                       <Badge variant="outline" className={statusColors[operation.status]}>
                         {operation.status === 'draft' && 'Brouillon'}
                         {operation.status === 'submitted' && 'Soumis'}
@@ -330,10 +372,32 @@ export function OperationsTab() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="icon" onClick={() => handleEditOperation(operation)}>
-                          <Edit className="h-4 w-4" />
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          {/* Bouton Voir détail - toujours visible */}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedOperation(operation)
+                              setIsDetailOpen(true)
+                            }}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Détail
+                          </Button>
+                          
+                          {/* Only show edit button for draft status (can be edited before submission) */}
+                          {operation.status === 'draft' && (
+                            <Button variant="ghost" size="icon" onClick={() => handleEditOperation(operation)}>
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {/* Only show delete button for draft, submitted, or rejected status */}
+                          {(operation.status === 'draft' || operation.status === 'submitted' || operation.status === 'rejected') && (
+                            <Button variant="ghost" size="icon" onClick={() => setDeletingOperationId(operation.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
                         {operation.status === 'draft' && (
                           <Button 
                             variant="outline" 
@@ -383,6 +447,17 @@ export function OperationsTab() {
                             Payer
                           </Button>
                         )}
+                        {operation.status === 'paid' && operation.payment_proof_url && (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-xs bg-blue-500/10 text-blue-700 hover:bg-blue-500/20"
+                            onClick={() => window.open(operation.payment_proof_url, '_blank')}
+                          >
+                            <Paperclip className="h-3 w-3 mr-1" />
+                            Voir le reçu
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -404,6 +479,9 @@ export function OperationsTab() {
           total_amount: editingOperation.total_amount,
           description: editingOperation.description,
           status: editingOperation.status,
+          category: editingOperation.category,
+          subcategory: editingOperation.subcategory,
+          subcategories: editingOperation.subcategories,
         } : undefined}
       />
 
@@ -419,13 +497,19 @@ export function OperationsTab() {
             <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deletingOperationId && handleDeleteOperation(deletingOperationId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Dialogue de détail d'opération */}
+      <OperationDetailDialog
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+        operation={convertToOperation(selectedOperation)}
+      />
     </div>
   )
 }

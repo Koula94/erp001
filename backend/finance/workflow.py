@@ -42,8 +42,13 @@ class ExpenseWorkflow:
                     'warnings': budget_check.get('warnings', [])
                 }
             
-            # Création de la dépense
-            self.expense = Expense.objects.create(**data)
+            # Mettre à jour l'instance de dépense existante avec les données
+            for key, value in data.items():
+                if hasattr(self.expense, key):
+                    setattr(self.expense, key, value)
+            
+            # Sauvegarder la dépense
+            self.expense.save()
             self.project = self.expense.project
             
             # Notifications initiales
@@ -123,35 +128,8 @@ class ExpenseWorkflow:
             'notifications': self.notifications
         }
     
-    def process_payment(self, paid_by, payment_date=None):
-        """Traitement du paiement"""
-        if self.expense.status != 'approved':
-            return {'success': False, 'error': 'La dépense doit être approuvée'}
-        
-        # Mise à jour du statut
-        self.expense.status = 'paid'
-        self.expense.paid_by = paid_by
-        self.expense.payment_date = payment_date or timezone.now().date()
-        self.expense.save()
-        
-        # Mise à jour de la trésorerie
-        self._update_cash_flow()
-        
-        # Lettrage automatique
-        self._auto_reconcile()
-        
-        # Notification
-        self._notify_payment()
-        
-        self.changes.append("Dépense payée et trésorerie mise à jour")
-        
-        return {
-            'success': True,
-            'expense': self.expense,
-            'cash_flow_updated': True,
-            'reconciled': True,
-            'notifications': self.notifications
-        }
+    # La méthode process_payment a été supprimée car le statut 'paid' n'existe plus pour les dépenses
+    # Les dépenses sont maintenant simplement approuvées et considérées comme engagées dans le budget
     
     def _validate_budget(self, amount):
         """Validation du budget disponible"""
@@ -170,7 +148,7 @@ class ExpenseWorkflow:
         if amount_float > remaining_budget:
             return {
                 'valid': False,
-                'message': f'Budget insuffisant. Restant: ${remaining_budget:.2f}, Dépense: ${amount_float:.2f}'
+                'message': f'Budget insuffisant. Restant: {remaining_budget:.2f}, Dépense: {amount_float:.2f}'
             }
         
         # Alertes de risque
@@ -183,7 +161,7 @@ class ExpenseWorkflow:
         
         return {
             'valid': True,
-            'message': f'Budget suffisant. Restant: ${remaining_budget:.2f}',
+            'message': f'Budget suffisant. Restant: {remaining_budget:.2f}',
             'warnings': warnings
         }
     
@@ -192,10 +170,10 @@ class ExpenseWorkflow:
         if not self.project:
             return
         
-        # Recalcul du budget dépensé
+        # Recalcul du budget dépensé (seulement les dépenses approuvées)
         approved_expenses = Expense.objects.filter(
             project=self.project,
-            status__in=['approved', 'paid']
+            status='approved'
         ).aggregate(total=Sum('amount'))['total'] or 0
         
         paid_invoices = Invoice.objects.filter(
@@ -357,8 +335,8 @@ class ExpenseWorkflowManager:
             },
             'approved': {
                 'name': 'Approuvé',
-                'description': 'Prêt pour paiement',
-                'next_actions': ['process_payment'],
+                'description': 'Dépense approuvée et budget engagé',
+                'next_actions': [],
                 'color': 'green'
             },
             'rejected': {
@@ -366,12 +344,6 @@ class ExpenseWorkflowManager:
                 'description': 'Dépense refusée',
                 'next_actions': ['resubmit'],
                 'color': 'red'
-            },
-            'paid': {
-                'name': 'Payé',
-                'description': 'Paiement effectué',
-                'next_actions': [],
-                'color': 'purple'
             }
         }
         
@@ -396,7 +368,7 @@ class ExpenseWorkflowManager:
         }
         
         # Par statut
-        for status in ['draft', 'submitted', 'under_review', 'approved', 'rejected', 'paid']:
+        for status in ['draft', 'submitted', 'under_review', 'approved', 'rejected']:
             status_expenses = expenses.filter(status=status)
             summary['by_status'][status] = {
                 'count': status_expenses.count(),
@@ -433,11 +405,5 @@ def process_expense_approval(expense_id, user):
     except Expense.DoesNotExist:
         return {'success': False, 'error': 'Dépense non trouvée'}
 
-def process_expense_payment(expense_id, user, payment_date=None):
-    """Traitement du paiement d'une dépense"""
-    try:
-        expense = Expense.objects.get(id=expense_id)
-        workflow = ExpenseWorkflow(expense)
-        return workflow.process_payment(user, payment_date)
-    except Expense.DoesNotExist:
-        return {'success': False, 'error': 'Dépense non trouvée'}
+# La fonction process_expense_payment a été supprimée car le statut 'paid' n'existe plus pour les dépenses
+# Les dépenses sont maintenant simplement approuvées et considérées comme engagées dans le budget

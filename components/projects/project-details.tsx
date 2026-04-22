@@ -18,6 +18,7 @@ import { ProjectRisksCard } from "./project-risks-card"
 import { generateProjectNotifications } from "@/lib/project-logic"
 import { ExpenseFormDialog } from "@/components/finance/expense-form-dialog"
 import { OperationFormDialog } from "@/components/finance/operation-form-dialog"
+import { OperationDetailDialog } from "@/components/finance/operation-detail-dialog"
 
 const statusColors = {
   "in-progress": "bg-blue-500/10 text-blue-700 dark:text-blue-400",
@@ -84,6 +85,8 @@ interface Expense {
   id: string
   description: string
   category: string
+  subcategory?: string
+  subcategories?: Array<{ name: string; amount: number }>
   amount: number
   date: string
   project: { id: string; name: string }
@@ -131,6 +134,9 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
   const [operations, setOperations] = useState<OperationRequest[]>([])
   const [operationDialogOpen, setOperationDialogOpen] = useState(false)
   const [editingOperation, setEditingOperation] = useState<OperationRequest | null>(null)
+  const [selectedOperation, setSelectedOperation] = useState<OperationRequest | null>(null)
+  const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
 
   useEffect(() => {
     loadProjectData()
@@ -151,6 +157,7 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
       let tasksResponse: any
       let milestonesResponse: any
       let operationsResponse: any
+      let expensesResponse: any
       
       try {
         projectData = await api.projects.get(projectId) as Project
@@ -184,6 +191,14 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
         operationsResponse = [] // Continuer avec une liste vide
       }
       
+      try {
+        expensesResponse = await api.get(`/finance/expenses/?project=${projectId}`)
+        console.log("Expenses response:", expensesResponse)
+      } catch (err: any) {
+        console.error("Failed to load expenses:", err)
+        expensesResponse = [] // Continuer avec une liste vide
+      }
+      
       // Handle different response formats safely
       const tasksData = (Array.isArray(tasksResponse) ? tasksResponse : 
                        (tasksResponse && typeof tasksResponse === 'object' && 'results' in tasksResponse ? 
@@ -197,21 +212,29 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
                             (operationsResponse && typeof operationsResponse === 'object' && 'results' in operationsResponse ? 
                              (operationsResponse as any).results : [])) as OperationRequest[]
       
+      const expensesData = (Array.isArray(expensesResponse) ? expensesResponse : 
+                          (expensesResponse && typeof expensesResponse === 'object' && 'results' in expensesResponse ? 
+                           (expensesResponse as any).results : [])) as Expense[]
+      
       console.log("Operations data loaded:", operationsData)
+      console.log("Expenses data loaded:", expensesData)
       
       // Filter tasks and milestones by project ID to ensure only this project's data is shown
       const filteredTasks = tasksData.filter(task => task.project === projectId)
       const filteredMilestones = milestonesData.filter(milestone => milestone.project === projectId)
       
-      // Operations are already filtered by the API with ?project=${projectId}
+      // Operations and expenses are already filtered by the API with ?project=${projectId}
       const filteredOperations = operationsData
+      const filteredExpenses = expensesData
       
       console.log("Filtered operations for project:", filteredOperations)
+      console.log("Filtered expenses for project:", filteredExpenses)
       
       setProject(projectData)
       setTasks(filteredTasks)
       setMilestones(filteredMilestones)
       setOperations(filteredOperations)
+      setExpenses(filteredExpenses)
     } catch (error: any) {
       console.error("Failed to load project data:", error)
       console.error("Error details:", {
@@ -334,45 +357,125 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
 
   const handleSaveExpense = async (expenseData: any) => {
     try {
-      console.log("Creating expense with data:", expenseData)
+      console.log("Saving expense with data:", expenseData)
       
-      // Create new expense with workflow
-      const response = await api.post('/finance/expenses/workflow/create/', {
-        project: projectId,
-        category: expenseData.category.toLowerCase(),
-        amount: parseFloat(expenseData.amount),
-        description: expenseData.description,
-        date: expenseData.date,
-        status: expenseData.status || 'draft',
-        priority: expenseData.priority || 'medium',
-        notes: expenseData.notes || '',
-      }) as any
+      let response: any
       
-      console.log("API Response:", response)
-      
-      if (response.success) {
-        const newExpense = response.expense
-        setExpenses([...expenses, newExpense])
+      if (editingExpense) {
+        // Update existing expense
+        response = await api.put(`/finance/expenses/${editingExpense.id}/`, {
+          project: projectId,
+          category: expenseData.category.toLowerCase(),
+          amount: parseFloat(expenseData.amount),
+          description: expenseData.description,
+          date: expenseData.date,
+          status: expenseData.status || 'draft',
+          priority: expenseData.priority || 'medium',
+          notes: expenseData.notes || '',
+        }) as any
         
-        // Show warnings if any
-        if (response.warnings && response.warnings.length > 0) {
-          alert(`⚠️ Alertes: ${response.warnings.join(', ')}`)
+        if (response.id) {
+          const updatedExpense = response
+          setExpenses(expenses.map((e) => (e.id === editingExpense.id ? updatedExpense : e)))
+          alert("✅ Dépense mise à jour avec succès!")
         }
+      } else {
+        // Create new expense with workflow
+        response = await api.post('/finance/expenses/workflow/create/', {
+          project: projectId,
+          category: expenseData.category.toLowerCase(),
+          amount: parseFloat(expenseData.amount),
+          description: expenseData.description,
+          date: expenseData.date,
+          status: expenseData.status || 'draft',
+          priority: expenseData.priority || 'medium',
+          notes: expenseData.notes || '',
+        }) as any
+        
+        console.log("API Response:", response)
+        
+        if (response.success) {
+          const newExpense = response.expense
+          setExpenses([...expenses, newExpense])
+          
+          // Show warnings if any
+          if (response.warnings && response.warnings.length > 0) {
+            alert(`⚠️ Alertes: ${response.warnings.join(', ')}`)
+          }
+          
+          alert("✅ Dépense créée avec succès!")
+        } else {
+          throw new Error(response.error || "Erreur inconnue lors de la création")
+        }
+      }
+      
+      // Reload project to get updated budget
+      const updatedProject = await api.projects.get(projectId) as Project
+      setProject(updatedProject)
+      
+      setExpenseDialogOpen(false)
+      setEditingExpense(null)
+    } catch (err: any) {
+      console.error("Error saving expense:", err)
+      const errorMessage = err.message || "Erreur lors de la sauvegarde"
+      alert(`❌ Échec de la sauvegarde: ${errorMessage}`)
+    }
+  }
+  
+  const handleExpenseWorkflowAction = async (expenseId: string, action: string, data?: any) => {
+    try {
+      let response: any
+      
+      switch (action) {
+        case 'submit':
+          response = await api.post(`/finance/expenses/${expenseId}/workflow/submit/`, {})
+          break
+        case 'approve':
+          response = await api.post(`/finance/expenses/${expenseId}/approve/`, {})
+          break
+        case 'reject':
+          response = await api.post(`/finance/expenses/${expenseId}/reject/`, {})
+          break
+        default:
+          throw new Error(`Action non supportée: ${action}`)
+      }
+      
+      if (response.id || response.success) {
+        // Update local state
+        const updatedExpense = response.id ? response : response.expense
+        setExpenses(expenses.map((e) => (e.id === expenseId ? updatedExpense : e)))
         
         // Reload project to get updated budget
         const updatedProject = await api.projects.get(projectId) as Project
         setProject(updatedProject)
         
-        alert("✅ Dépense créée avec succès!")
+        // Show success message
+        alert(`✅ Action "${action}" effectuée avec succès`)
       } else {
-        throw new Error(response.error || "Erreur inconnue lors de la création")
+        throw new Error(response.error || "Action failed")
       }
-      
-      setExpenseDialogOpen(false)
     } catch (err: any) {
-      console.error("Error saving expense:", err)
-      const errorMessage = err.message || "Erreur lors de la sauvegarde"
-      alert(`❌ Échec de la création: ${errorMessage}`)
+      console.error("Error processing expense workflow action:", err)
+      const errorMessage = err.message || "Échec de l'action"
+      alert(`❌ Échec de l'action: ${errorMessage}`)
+    }
+  }
+  
+  const handleEditExpense = (expense: Expense) => {
+    setEditingExpense(expense)
+    setExpenseDialogOpen(true)
+  }
+  
+  const handleDeleteExpense = async (expenseId: string) => {
+    if (confirm("Êtes-vous sûr de vouloir supprimer cette dépense ?")) {
+      try {
+        await api.delete(`/finance/expenses/${expenseId}/`)
+        setExpenses(expenses.filter((e) => e.id !== expenseId))
+        alert("✅ Dépense supprimée avec succès!")
+      } catch (error: any) {
+        console.error("Failed to delete expense:", error)
+        alert("❌ Échec de la suppression de la dépense")
+      }
     }
   }
 
@@ -478,9 +581,42 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
         throw new Error(response.error || "Action failed")
       }
     } catch (err: any) {
-      console.error("Error processing workflow action:", err)
-      const errorMessage = err.message || "Échec de l'action"
-      alert(`❌ Échec de l'action: ${errorMessage}`)
+      // Gestion robuste des erreurs
+      let errorMessage = "Échec de l'action"
+      
+      // Essayer de récupérer le message d'erreur de différentes manières
+      if (err?.message) {
+        errorMessage = err.message
+      } else if (err?.response?.data?.error) {
+        errorMessage = err.response.data.error
+      } else if (err?.response?.data?.detail) {
+        errorMessage = err.response.data.detail
+      } else if (typeof err === 'string') {
+        errorMessage = err
+      } else if (err && Object.keys(err).length > 0) {
+        // Si l'objet n'est pas vide, afficher pour débogage
+        console.error("Error processing workflow action:", err)
+        errorMessage = JSON.stringify(err)
+      }
+      
+      // Si c'est une erreur de validation de budget, formater le message
+      if (errorMessage.includes('Validation budget échouée:')) {
+        // Extraire le message détaillé du backend
+        const detailedMessage = errorMessage.replace('Validation budget échouée:', '').trim()
+        
+        // Simplifier le message pour l'alerte
+        const simplifiedMessage = detailedMessage
+          .replace(/\*\*/g, '') // Enlever les **
+          .replace(/📊/g, '📊') // Garder l'emoji
+          .replace(/💡/g, '💡') // Garder l'emoji
+        
+        // Afficher une alerte simple mais informative
+        alert(`❌ VALIDATION DU BUDGET ÉCHOUÉE\n\n${simplifiedMessage}`)
+        return
+      }
+      
+      // Pour les autres erreurs, afficher une alerte standard
+      alert(`❌ Échec de l'action\n\n${errorMessage}`)
     }
   }
 
@@ -502,10 +638,34 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
   }
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'GNF',
-    }).format(amount)
+    try {
+      // Handle invalid amounts
+      if (amount === null || amount === undefined) {
+        return new Intl.NumberFormat('fr-FR', {
+          style: 'currency',
+          currency: 'GNF',
+        }).format(0)
+      }
+      
+      // Ensure amount is a number
+      const numAmount = typeof amount === 'string' ? parseFloat(amount) : Number(amount)
+      
+      // Check if the parsed amount is NaN or invalid
+      if (isNaN(numAmount) || !isFinite(numAmount)) {
+        return new Intl.NumberFormat('fr-FR', {
+          style: 'currency',
+          currency: 'GNF',
+        }).format(0)
+      }
+      
+      return new Intl.NumberFormat('fr-FR', {
+        style: 'currency',
+        currency: 'GNF',
+      }).format(numAmount)
+    } catch (error) {
+      console.error('Error formatting currency:', error, 'Amount:', amount)
+      return 'GNF 0,00'
+    }
   }
 
   return (
@@ -792,9 +952,24 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" onClick={() => handleEditOperation(operation)}>
-                              <Pencil className="h-4 w-4" />
+                            {/* Bouton Voir détail - toujours visible */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedOperation(operation)
+                                setIsDetailOpen(true)
+                              }}
+                            >
+                              Détail
                             </Button>
+                            
+                            {/* Bouton d'édition - visible uniquement pour les opérations en statut "draft" */}
+                            {operation.status === 'draft' && (
+                              <Button variant="ghost" size="icon" onClick={() => handleEditOperation(operation)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                            )}
                             {operation.status === 'draft' && (
                               <Button 
                                 variant="outline" 
@@ -890,70 +1065,278 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
         </TabsContent>
 
         <TabsContent value="expenses" className="mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Dépenses du Projet</CardTitle>
-                  <CardDescription>Gérez les dépenses associées à ce projet</CardDescription>
+          <div className="space-y-6">
+            {/* Statistiques des dépenses */}
+            <div className="grid gap-4 md:grid-cols-4">
+               <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Total Dépenses</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(expenses.reduce((sum, expense) => sum + expense.amount, 0))}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">{expenses.length} dépenses</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Approuvées</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(expenses.filter(e => e.status === 'approved').reduce((sum, expense) => sum + expense.amount, 0))}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {expenses.filter(e => e.status === 'approved').length} dépenses
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">En attente</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(expenses.filter(e => ['draft', 'submitted', 'under_review'].includes(e.status)).reduce((sum, expense) => sum + expense.amount, 0))}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {expenses.filter(e => ['draft', 'submitted', 'under_review'].includes(e.status)).length} dépenses
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">Rejetées</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-2xl font-bold">
+                    {formatCurrency(expenses.filter(e => e.status === 'rejected').reduce((sum, expense) => sum + expense.amount, 0))}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {expenses.filter(e => e.status === 'rejected').length} dépenses
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Tableau des dépenses */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Dépenses du Projet</CardTitle>
+                    <CardDescription>Gérez le workflow complet des dépenses associées à ce projet</CardDescription>
+                  </div>
+                  <Button onClick={() => {
+                    setEditingExpense(null)
+                    setExpenseDialogOpen(true)
+                  }}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Nouvelle Dépense
+                  </Button>
                 </div>
-                <Button onClick={() => setExpenseDialogOpen(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Nouvelle Dépense
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent>
-              {expenses.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p>Aucune dépense enregistrée pour ce projet</p>
-                  <p className="text-sm">Créez votre première dépense pour commencer</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Catégorie</TableHead>
-                      <TableHead>Montant</TableHead>
-                      <TableHead>Priorité</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Statut</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {expenses.map((expense) => (
-                      <TableRow key={expense.id}>
-                        <TableCell className="font-medium max-w-xs truncate">
-                          {expense.description}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="bg-blue-500/10 text-blue-700">
-                            {expense.category}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-semibold">
-                          GNF{expense.amount.toLocaleString()}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={priorityColors[expense.priority as keyof typeof priorityColors]}>
-                            {expense.priority}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={statusColors[expense.status as keyof typeof statusColors]}>
-                            {expense.status}
-                          </Badge>
-                        </TableCell>
+              </CardHeader>
+              <CardContent>
+                {expenses.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <DollarSign className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p>Aucune dépense enregistrée pour ce projet</p>
+                    <p className="text-sm">Créez votre première dépense pour commencer</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Catégorie</TableHead>
+                        <TableHead>Sous-catégorie</TableHead>
+                        <TableHead>Montant</TableHead>
+                        <TableHead>Priorité</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Statut</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {expenses.map((expense) => {
+                        const expenseStatusColors: { [key: string]: string } = {
+                          draft: "bg-gray-500/10 text-gray-700 dark:text-gray-400",
+                          submitted: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+                          under_review: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
+                          approved: "bg-green-500/10 text-green-700 dark:text-green-400",
+                          rejected: "bg-red-500/10 text-red-700 dark:text-red-400",
+                        }
+                        
+                        const statusLabels: { [key: string]: string } = {
+                          draft: "Brouillon",
+                          submitted: "Soumis",
+                          under_review: "En révision",
+                          approved: "Approuvé",
+                          rejected: "Rejeté",
+                        }
+                        
+                        const categoryLabels: { [key: string]: string } = {
+                          materials: "Matériaux",
+                          labor: "Main d'œuvre",
+                          equipment: "Équipement",
+                          transport: "Transport",
+                          utilities: "Services",
+                          consulting: "Consulting",
+                          software: "Logiciels",
+                          other: "Autre",
+                        }
+                        
+                        const priorityLabels: { [key: string]: string } = {
+                          low: "Faible",
+                          medium: "Moyenne",
+                          high: "Haute",
+                          urgent: "Urgente",
+                        }
+                        
+                        return (
+                          <TableRow key={expense.id}>
+                            <TableCell className="font-medium max-w-xs">
+                              <div className="flex flex-col">
+                                <span>{expense.description}</span>
+                                {expense.notes && (
+                                  <span className="text-xs text-muted-foreground mt-1">{expense.notes}</span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="bg-blue-500/10 text-blue-700">
+                                {categoryLabels[expense.category] || expense.category}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              {expense.subcategory && expense.subcategory.trim() ? (
+                                <span className="text-sm text-muted-foreground">{expense.subcategory}</span>
+                              ) : expense.subcategories && expense.subcategories.length > 0 ? (
+                                <div className="flex flex-wrap gap-1">
+                                  {expense.subcategories.map((sc, idx) => (
+                                    <Badge key={idx} variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 text-xs">
+                                      {sc.name}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-xs text-muted-foreground italic">Aucune</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-semibold">
+                              {formatCurrency(expense.amount)}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className={priorityColors[expense.priority as keyof typeof priorityColors]}>
+                                {priorityLabels[expense.priority] || expense.priority}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{new Date(expense.date).toLocaleDateString('fr-FR')}</TableCell>
+                            <TableCell>
+                              <div className="flex flex-col gap-1">
+                                <Badge variant="outline" className={expenseStatusColors[expense.status]}>
+                                  {statusLabels[expense.status] || expense.status}
+                                </Badge>
+                                {expense.payment_date && (
+                                  <span className="text-xs text-muted-foreground">
+                                    Payé le {new Date(expense.payment_date).toLocaleDateString('fr-FR')}
+                                  </span>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                {/* Bouton d'édition - visible uniquement pour les dépenses en statut "draft" */}
+                                {expense.status === 'draft' && (
+                                  <Button variant="ghost" size="icon" onClick={() => handleEditExpense(expense)}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                
+                                {/* Bouton de suppression - visible uniquement pour les dépenses en statut "draft" */}
+                                {expense.status === 'draft' && (
+                                  <Button variant="ghost" size="icon" onClick={() => handleDeleteExpense(expense.id)}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                
+                                {/* Actions de workflow */}
+                                {expense.status === 'draft' && (
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="text-xs"
+                                    onClick={() => handleExpenseWorkflowAction(expense.id, 'submit')}
+                                  >
+                                    Soumettre
+                                  </Button>
+                                )}
+                                
+                                {expense.status === 'submitted' && (
+                                  <>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      className="text-xs bg-green-500/10 text-green-700 hover:bg-green-500/20"
+                                      onClick={() => handleExpenseWorkflowAction(expense.id, 'approve')}
+                                    >
+                                      Approuver
+                                    </Button>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      className="text-xs bg-red-500/10 text-red-700 hover:bg-red-500/20"
+                                      onClick={() => {
+                                        const reason = prompt("Raison du rejet:")
+                                        if (reason) {
+                                          handleExpenseWorkflowAction(expense.id, 'reject')
+                                        }
+                                      }}
+                                    >
+                                      Rejeter
+                                    </Button>
+                                  </>
+                                )}
+                                
+                                {expense.status === 'under_review' && (
+                                  <>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      className="text-xs bg-green-500/10 text-green-700 hover:bg-green-500/20"
+                                      onClick={() => handleExpenseWorkflowAction(expense.id, 'approve')}
+                                    >
+                                      Approuver
+                                    </Button>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      className="text-xs bg-red-500/10 text-red-700 hover:bg-red-500/20"
+                                      onClick={() => {
+                                        const reason = prompt("Raison du rejet:")
+                                        if (reason) {
+                                          handleExpenseWorkflowAction(expense.id, 'reject')
+                                        }
+                                      }}
+                                    >
+                                      Rejeter
+                                    </Button>
+                                  </>
+                                )}
+                                
+                                {/* Le statut 'approved' est maintenant le statut final - pas d'action de paiement */}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="budget" className="mt-6">
@@ -1020,6 +1403,17 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
         open={expenseDialogOpen}
         onOpenChange={setExpenseDialogOpen}
         onSubmit={handleSaveExpense}
+        initialData={editingExpense ? {
+          description: editingExpense.description,
+          category: editingExpense.category,
+          amount: editingExpense.amount,
+          date: editingExpense.date,
+          status: editingExpense.status,
+          priority: editingExpense.priority,
+          notes: editingExpense.notes,
+        } : undefined}
+        projectId={projectId}
+        projectName={project?.name}
       />
       <OperationFormDialog
         open={operationDialogOpen}
@@ -1035,6 +1429,13 @@ export function ProjectDetails({ projectId }: ProjectDetailsProps) {
         } : undefined}
         projectId={projectId}
         projectName={project?.name}
+      />
+
+      {/* Dialogue de détail d'opération */}
+      <OperationDetailDialog
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+        operation={selectedOperation}
       />
     </div>
   )

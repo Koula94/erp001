@@ -13,8 +13,7 @@ from .workflow import (
     ExpenseWorkflow,
     ExpenseWorkflowManager,
     create_expense_with_workflow,
-    process_expense_approval,
-    process_expense_payment
+    process_expense_approval
 )
 from projects.models import Project
 
@@ -26,7 +25,7 @@ def create_expense_workflow(request):
         data = request.data.copy()
         
         # Ajout de l'utilisateur connecté comme créateur
-        data['submitted_by'] = request.user.id
+        data['submitted_by'] = request.user  # Passer l'instance User, pas juste l'ID
         
         # Validation des données requises
         required_fields = ['description', 'category', 'amount', 'date', 'project']
@@ -40,7 +39,7 @@ def create_expense_workflow(request):
         # Récupération de l'instance du projet
         try:
             project = Project.objects.get(id=data['project'])
-            data['project'] = project.id  # Garder l'ID pour la création
+            data['project'] = project  # Passer l'instance du projet, pas juste l'ID
         except Project.DoesNotExist:
             return Response({
                 'success': False,
@@ -140,39 +139,8 @@ def approve_expense(request, expense_id):
             'error': f'Erreur lors de l\'approbation: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def process_expense_payment_api(request, expense_id):
-    """Traitement du paiement d'une dépense"""
-    try:
-        payment_date = request.data.get('payment_date')
-        
-        result = process_expense_payment(expense_id, request.user, payment_date)
-        
-        if result['success']:
-            return Response({
-                'success': True,
-                'expense': {
-                    'id': result['expense'].id,
-                    'status': result['expense'].status,
-                    'paid_by': result['expense'].paid_by.username if result['expense'].paid_by else None,
-                    'payment_date': result['expense'].payment_date
-                },
-                'cash_flow_updated': result.get('cash_flow_updated', False),
-                'reconciled': result.get('reconciled', False),
-                'notifications': result.get('notifications', [])
-            })
-        else:
-            return Response({
-                'success': False,
-                'error': result['error']
-            }, status=status.HTTP_400_BAD_REQUEST)
-            
-    except Exception as e:
-        return Response({
-            'success': False,
-            'error': f'Erreur lors du paiement: {str(e)}'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+# La vue process_expense_payment_api a été supprimée car le statut 'paid' n'existe plus pour les dépenses
+# Les dépenses sont maintenant simplement approuvées et considérées comme engagées dans le budget
 
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
@@ -304,18 +272,13 @@ def get_expense_workflow_actions(request, expense_id):
             ]
         elif expense.status == 'approved':
             actions = [
-                {'action': 'process_payment', 'label': 'Traiter le paiement', 'type': 'primary'},
-                {'action': 'hold_payment', 'label': 'Mettre en attente', 'type': 'secondary'}
+                # Aucune action disponible pour les dépenses approuvées
+                # Le statut 'approved' est maintenant le statut final
             ]
         elif expense.status == 'rejected':
             actions = [
                 {'action': 'resubmit', 'label': 'Resoumettre', 'type': 'primary'},
                 {'action': 'edit', 'label': 'Modifier', 'type': 'secondary'}
-            ]
-        elif expense.status == 'paid':
-            actions = [
-                {'action': 'view_receipt', 'label': 'Voir le reçu', 'type': 'secondary'},
-                {'action': 'download_report', 'label': 'Télécharger rapport', 'type': 'secondary'}
             ]
         
         return Response({

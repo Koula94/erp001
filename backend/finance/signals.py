@@ -67,8 +67,6 @@ def _handle_expense_update(expense):
                 _handle_submission(expense)
             elif expense.status == 'approved':
                 _handle_approval(expense)
-            elif expense.status == 'paid':
-                _handle_payment(expense)
             elif expense.status == 'rejected':
                 _handle_rejection(expense)
         
@@ -143,10 +141,10 @@ def _handle_amount_change(expense, old_amount):
 def _update_project_budget_from_invoice(project):
     """Mise à jour du budget projet à partir d'une facture payée"""
     try:
-        # Recalcul du budget dépensé
+        # Recalcul du budget dépensé (seulement les dépenses approuvées)
         approved_expenses = Expense.objects.filter(
             project=project,
-            status__in=['approved', 'paid']
+            status='approved'
         ).aggregate(total=Sum('amount'))['total'] or 0
         
         paid_invoices = Invoice.objects.filter(

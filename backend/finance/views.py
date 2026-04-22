@@ -10,8 +10,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 from datetime import datetime
-from .models import Invoice, Expense, Budget, OperationRequest
-from .serializers import InvoiceSerializer, ExpenseSerializer, BudgetSerializer, OperationRequestSerializer
+from .models import Invoice, Expense, Budget, OperationRequest, OperationSubcategory
+from .serializers import InvoiceSerializer, ExpenseSerializer, BudgetSerializer, OperationRequestSerializer, OperationRequestWithSubcategoriesSerializer
 
 class InvoiceViewSet(viewsets.ModelViewSet):
     queryset = Invoice.objects.all().select_related('client', 'project').order_by('-created_at')
@@ -277,8 +277,8 @@ class OperationRequestViewSet(viewsets.ModelViewSet):
     """ViewSet pour la gestion des demandes d'opération"""
     queryset = OperationRequest.objects.all().select_related(
         'project', 'requester', 'validated_by'
-    ).order_by('-request_date')
-    serializer_class = OperationRequestSerializer
+    ).prefetch_related('subcategories').order_by('-request_date')
+    serializer_class = OperationRequestWithSubcategoriesSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter, DjangoFilterBackend]
     search_fields = ['task_name', 'reference', 'description']
     filterset_fields = ['status', 'project', 'period']
@@ -305,17 +305,19 @@ class OperationRequestViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # Validation du budget
-        budget_valid, budget_message = operation.validate_budget_availability()
-        if not budget_valid:
-            return Response(
-                {'error': f'Validation budget échouée: {budget_message}'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # NOTE: On ne vérifie PAS le budget à la soumission
+        # La vérification se fera seulement à la validation
+        # Cela permet de soumettre des demandes même si le budget est insuffisant
+        # Le validateur pourra alors décider d'augmenter le budget ou de rejeter
         
         # Mise à jour du statut
         operation.status = 'submitted'
         operation.save()
+        
+        # Log pour information (pas d'erreur)
+        budget_valid, budget_message = operation.validate_budget_availability()
+        if not budget_valid:
+            print(f"⚠️ Opération {operation.reference} soumise avec budget insuffisant: {budget_message}")
         
         serializer = self.get_serializer(operation)
         return Response(serializer.data)

@@ -54,7 +54,7 @@ def sync_project_on_finance_change(sender, instance, **kwargs):
             if finance_sync_result['spent_changed']:
                 project.save()
                 print(f"Budget du projet {project.name} synchronisé automatiquement: "
-                      f"dépensé=${finance_sync_result['new_spent']}, "
+                      f"dépensé={finance_sync_result['new_spent']}, "
                       f"budget utilisé={finance_sync_result['budget_used_percentage']:.1f}%, "
                       f"statut={finance_sync_result['budget_status']}")
     except Exception as e:
@@ -75,7 +75,7 @@ def sync_project_on_finance_delete(sender, instance, **kwargs):
             if finance_sync_result['spent_changed']:
                 project.save()
                 print(f"Budget du projet {project.name} synchronisé après suppression: "
-                      f"dépensé=${finance_sync_result['new_spent']}, "
+                      f"dépensé={finance_sync_result['new_spent']}, "
                       f"budget utilisé={finance_sync_result['budget_used_percentage']:.1f}%, "
                       f"statut={finance_sync_result['budget_status']}")
     except Exception as e:

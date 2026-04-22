@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, Search, FileText, Edit, Trash2, Loader2 } from "lucide-react"
 import { api } from "@/lib/api"
 import { ExpenseFormDialog } from "./expense-form-dialog"
+import { getCategoryName, getCategoryColor } from "@/lib/categories"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,25 +27,18 @@ const statusColors: { [key: string]: string } = {
   under_review: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
   approved: "bg-green-500/10 text-green-700 dark:text-green-400",
   rejected: "bg-red-500/10 text-red-700 dark:text-red-400",
-  paid: "bg-purple-500/10 text-purple-700 dark:text-purple-400",
-}
-
-const priorityColors: { [key: string]: string } = {
-  low: "bg-green-500/10 text-green-700 dark:text-green-400",
-  medium: "bg-yellow-500/10 text-yellow-700 dark:text-yellow-400",
-  high: "bg-orange-500/10 text-orange-700 dark:text-orange-400",
-  urgent: "bg-red-500/10 text-red-700 dark:text-red-400",
 }
 
 interface Expense {
   id: string
   description: string
   category: string
+  subcategory?: string
+  subcategories?: Array<{ name: string; amount: number }>
   amount: number
   date: string
   project: { id: string; name: string }
   status: string
-  priority: string
   submitted_by?: { id: string; name: string }
   approved_by?: { id: string; name: string }
   paid_by?: { id: string; name: string }
@@ -91,30 +85,28 @@ export function ExpensesTab() {
 
   const handleSaveExpense = async (expenseData: any) => {
     try {
+      // Préparer les données avec sous-catégories
+      const expensePayload: any = {
+        project: "1", // TODO: Get from form or context
+        category: expenseData.category.toLowerCase(),
+        amount: expenseData.amount,
+        description: expenseData.description,
+        date: expenseData.date,
+        status: expenseData.status,
+        notes: expenseData.notes,
+      }
+      
+      // Ajouter les sous-catégories (toujours présentes, même si vides)
+      expensePayload.subcategory = expenseData.subcategory || ''
+      expensePayload.subcategories = expenseData.subcategories || []
+      
       if (editingExpense) {
         // Update existing expense
-        const updatedExpense = await api.expenses.update(editingExpense.id, {
-          project: "1", // TODO: Get from form or context
-          category: expenseData.category.toLowerCase(),
-          amount: expenseData.amount,
-          description: expenseData.description,
-          date: expenseData.date,
-          status: expenseData.status,
-          priority: expenseData.priority,
-        }) as Expense
+        const updatedExpense = await api.expenses.update(editingExpense.id, expensePayload) as Expense
         setExpenses(expenses.map((e) => (e.id === editingExpense.id ? updatedExpense : e)))
       } else {
         // Create new expense with workflow
-        const response = await api.post('/finance/expenses/workflow/create/', {
-          project: "1", // TODO: Get from form or context
-          category: expenseData.category.toLowerCase(),
-          amount: expenseData.amount,
-          description: expenseData.description,
-          date: expenseData.date,
-          status: expenseData.status,
-          priority: expenseData.priority,
-          notes: expenseData.notes,
-        }) as any
+        const response = await api.post('/finance/expenses/workflow/create/', expensePayload) as any
         
         if (response.success) {
           const newExpense = response.expense
@@ -145,9 +137,6 @@ export function ExpensesTab() {
           break
         case 'approve':
           response = await api.post(`/finance/expenses/${expenseId}/workflow/approve/`, {})
-          break
-        case 'process_payment':
-          response = await api.post(`/finance/expenses/${expenseId}/workflow/payment/`, {})
           break
         default:
           throw new Error(`Action non supportée: ${action}`)
@@ -236,8 +225,8 @@ export function ExpensesTab() {
                 <TableRow>
                   <TableHead>Description</TableHead>
                   <TableHead>Catégorie</TableHead>
+                  <TableHead>Sous-catégorie</TableHead>
                   <TableHead>Montant</TableHead>
-                  <TableHead>Priorité</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Projet</TableHead>
                   <TableHead>Statut</TableHead>
@@ -251,17 +240,29 @@ export function ExpensesTab() {
                       {expense.description}
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className="bg-blue-500/10 text-blue-700">
-                        {expense.category}
+                      <Badge variant="outline" className={getCategoryColor(expense.category)}>
+                        {getCategoryName(expense.category)}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {expense.subcategory && expense.subcategory.trim() ? (
+                        <Badge variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200">
+                          {expense.subcategory}
+                        </Badge>
+                      ) : expense.subcategories && expense.subcategories.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {expense.subcategories.map((sc, idx) => (
+                            <Badge key={idx} variant="outline" className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-200 text-xs">
+                              {sc.name}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Aucune</span>
+                      )}
                     </TableCell>
                     <TableCell className="font-semibold">
                       ${expense.amount.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={priorityColors[expense.priority]}>
-                        {expense.priority}
-                      </Badge>
                     </TableCell>
                     <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
                     <TableCell>
@@ -306,16 +307,7 @@ export function ExpensesTab() {
                             Approuver
                           </Button>
                         )}
-                        {expense.status === 'approved' && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="text-xs"
-                            onClick={() => handleWorkflowAction(expense.id, 'process_payment')}
-                          >
-                            Payer
-                          </Button>
-                        )}
+                        {/* Le statut 'approved' est maintenant le statut final - pas d'action de paiement */}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -336,6 +328,8 @@ export function ExpensesTab() {
           amount: editingExpense.amount,
           date: editingExpense.date,
           status: editingExpense.status,
+          subcategory: editingExpense.subcategory,
+          subcategories: editingExpense.subcategories,
         } : undefined}
       />
 
