@@ -10,25 +10,31 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
 import {
   FileText,
   DollarSign,
-  CheckCircle,
+  CheckCircle2,
   XCircle,
   Clock,
   Send,
   Download,
   Eye,
+  User,
+  Calendar,
+  Briefcase,
+  RotateCcw,
+  CreditCard,
+  ClipboardList,
+  Hash,
+  AlertCircle,
+  CheckIcon,
 } from "lucide-react"
 
 // ─────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────
-
-interface Subcategory {
-  name?: string
-  amount?: number
-}
 
 export interface Operation {
   id: string | number
@@ -44,14 +50,11 @@ export interface Operation {
   rejection_reason?: string | null
   payment_proof_url?: string | null
   payment_proof?: boolean
+  quote_url?: string | null
   project?: { name?: string } | null
   project_name?: string | null
-  category?: string | null
-  categories?: string[] | null  // Nouveau champ pour plusieurs catégories
   total_amount: number
   description?: string | null
-  subcategory?: string | Subcategory[] | null
-  subcategories?: string | Subcategory[] | null
 }
 
 interface OperationDetailDialogProps {
@@ -64,65 +67,69 @@ interface OperationDetailDialogProps {
 // Constants
 // ─────────────────────────────────────────────
 
-const STATUS_COLORS: Record<string, string> = {
-  draft:     "bg-gray-500/10  text-gray-700  dark:text-gray-400",
-  submitted: "bg-blue-500/10  text-blue-700  dark:text-blue-400",
-  validated: "bg-green-500/10 text-green-700 dark:text-green-400",
-  paid:      "bg-purple-500/10 text-purple-700 dark:text-purple-400",
-  rejected:  "bg-red-500/10   text-red-700   dark:text-red-400",
+const STATUS_CONFIG: Record<string, { color: string; bg: string; icon: React.ReactNode; label: string; step: number }> = {
+  draft: {
+    color: "text-gray-700 dark:text-gray-400",
+    bg: "bg-gray-500/10 border-gray-200",
+    icon: <Clock className="h-4 w-4" />,
+    label: "Brouillon",
+    step: 1,
+  },
+  submitted: {
+    color: "text-blue-700 dark:text-blue-400",
+    bg: "bg-blue-500/10 border-blue-200",
+    icon: <Send className="h-4 w-4" />,
+    label: "Soumis",
+    step: 2,
+  },
+  validated: {
+    color: "text-green-700 dark:text-green-400",
+    bg: "bg-green-500/10 border-green-200",
+    icon: <CheckCircle2 className="h-4 w-4" />,
+    label: "Validé",
+    step: 3,
+  },
+  paid: {
+    color: "text-purple-700 dark:text-purple-400",
+    bg: "bg-purple-500/10 border-purple-200",
+    icon: <DollarSign className="h-4 w-4" />,
+    label: "Payé",
+    step: 4,
+  },
+  rejected: {
+    color: "text-red-700 dark:text-red-400",
+    bg: "bg-red-500/10 border-red-200",
+    icon: <XCircle className="h-4 w-4" />,
+    label: "Rejeté",
+    step: 0,
+  },
 }
 
 const PERIOD_LABELS: Record<string, string> = {
-  daily:     "Quotidien",
-  weekly:    "Hebdomadaire",
-  monthly:   "Mensuel",
+  daily: "Quotidien",
+  weekly: "Hebdomadaire",
+  monthly: "Mensuel",
   quarterly: "Trimestriel",
-  yearly:    "Annuel",
-  one_time:  "Ponctuel",
+  yearly: "Annuel",
+  one_time: "Ponctuel",
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  materials:  "Matériaux",
-  labor:      "Main d'œuvre",
-  equipment:  "Équipement",
-  transport:  "Transport",
-  utilities:  "Services",
-  consulting: "Consulting",
-  software:   "Logiciels",
-  other:      "Autre",
-}
+const WORKFLOW_STEPS = [
+  { key: "draft", label: "Brouillon", icon: <Clock className="h-4 w-4" /> },
+  { key: "submitted", label: "Soumis", icon: <Send className="h-4 w-4" /> },
+  { key: "validated", label: "Validé", icon: <CheckCircle2 className="h-4 w-4" /> },
+  { key: "paid", label: "Payé", icon: <DollarSign className="h-4 w-4" /> },
+]
 
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
 
-const getStatusIcon = (status: string) => {
-  switch (status) {
-    case "draft":     return <Clock       className="h-4 w-4" />
-    case "submitted": return <Send        className="h-4 w-4" />
-    case "validated": return <CheckCircle className="h-4 w-4" />
-    case "paid":      return <DollarSign  className="h-4 w-4" />
-    case "rejected":  return <XCircle     className="h-4 w-4" />
-    default:          return <FileText    className="h-4 w-4" />
-  }
-}
-
-const getStatusLabel = (status: string) => {
-  switch (status) {
-    case "draft":     return "Brouillon"
-    case "submitted": return "Soumis"
-    case "validated": return "Validé"
-    case "paid":      return "Payé"
-    case "rejected":  return "Rejeté"
-    default:          return status
-  }
-}
-
 const formatCurrency = (amount: number) => {
   if (isNaN(amount) || !isFinite(amount)) return "0 GNF"
   return new Intl.NumberFormat("fr-FR", {
-    style:                 "currency",
-    currency:              "GNF",
+    style: "currency",
+    currency: "GNF",
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(amount)
@@ -131,28 +138,133 @@ const formatCurrency = (amount: number) => {
 const formatDate = (dateString?: string | null) => {
   if (!dateString) return "Non spécifiée"
   return new Date(dateString).toLocaleDateString("fr-FR", {
-    day:    "2-digit",
-    month:  "2-digit",
-    year:   "numeric",
-    hour:   "2-digit",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
     minute: "2-digit",
   })
 }
 
-const parseSubcategories = (
-  data: string | Subcategory[] | null | undefined
-): Subcategory[] => {
-  if (!data) return []
-  if (Array.isArray(data)) return data
-  if (typeof data === "string") {
-    try {
-      const parsed = JSON.parse(data)
-      return Array.isArray(parsed) ? parsed : []
-    } catch {
-      return [{ name: data, amount: 0 }]
-    }
-  }
-  return []
+const formatDateShort = (dateString?: string | null) => {
+  if (!dateString) return "—"
+  return new Date(dateString).toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+// ─────────────────────────────────────────────
+// Workflow Timeline Component
+// ─────────────────────────────────────────────
+
+function WorkflowTimeline({ status }: { status: string }) {
+  const currentStep = STATUS_CONFIG[status]?.step ?? 0
+  const isRejected = status === "rejected"
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+        <RotateCcw className="h-4 w-4" />
+        Progression du workflow
+      </h3>
+      <div className="relative">
+        {/* Barre de progression */}
+        <div className="absolute top-5 left-0 right-0 h-1 bg-muted rounded-full">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${
+              isRejected ? "bg-red-500" : "bg-green-500"
+            }`}
+            style={{
+              width: isRejected
+                ? "100%"
+                : currentStep === 1
+                ? "0%"
+                : currentStep === 2
+                ? "33%"
+                : currentStep === 3
+                ? "66%"
+                : currentStep === 4
+                ? "100%"
+                : "0%",
+            }}
+          />
+        </div>
+
+        {/* Étapes */}
+        <div className="relative flex justify-between">
+          {WORKFLOW_STEPS.map((step, index) => {
+            const stepNumber = index + 1
+            const isActive = stepNumber <= currentStep && !isRejected
+            const isCurrent = stepNumber === currentStep && !isRejected
+
+            return (
+              <div key={step.key} className="flex flex-col items-center gap-2">
+                <div
+                  className={`h-10 w-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 z-10 ${
+                    isActive
+                      ? isCurrent
+                        ? "bg-green-500 border-green-500 text-white shadow-lg shadow-green-500/30"
+                        : "bg-green-500 border-green-500 text-white"
+                      : "bg-background border-muted text-muted-foreground"
+                  }`}
+                >
+                  {isActive ? <CheckIcon className="h-5 w-5" /> : step.icon}
+                </div>
+                <span
+                  className={`text-xs font-medium ${
+                    isActive ? "text-foreground" : "text-muted-foreground"
+                  }`}
+                >
+                  {step.label}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {isRejected && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-red-500/10 border border-red-200">
+          <AlertCircle className="h-4 w-4 text-red-600" />
+          <span className="text-sm text-red-700">
+            Cette demande a été rejetée
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────
+// Info Row Component
+// ─────────────────────────────────────────────
+
+function InfoRow({
+  icon,
+  label,
+  value,
+  highlight = false,
+}: {
+  icon: React.ReactNode
+  label: string
+  value: React.ReactNode
+  highlight?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors">
+      <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center shrink-0">
+        {icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className={`text-sm font-medium truncate ${highlight ? "text-lg text-primary" : ""}`}>
+          {value}
+        </p>
+      </div>
+    </div>
+  )
 }
 
 // ─────────────────────────────────────────────
@@ -166,289 +278,228 @@ export function OperationDetailDialog({
 }: OperationDetailDialogProps) {
   if (!operation) return null
 
-  // Debug: Afficher les données reçues
-  console.log("Données de l'opération reçues:", operation)
-  console.log("Champ category:", operation.category)
-  console.log("Champ categories:", operation.categories)
-  console.log("Type de categories:", typeof operation.categories)
-
-  // Gérer les catégories (simple ou multiples)
-  const getCategoryLabels = () => {
-    // 1. Si categories existe et est un tableau, utiliser cela
-    if (operation.categories && Array.isArray(operation.categories) && operation.categories.length > 0) {
-      console.log("Utilisation du champ categories (tableau):", operation.categories)
-      return operation.categories.map(cat => 
-        CATEGORY_LABELS[cat ?? ""] ?? cat ?? "Non spécifiée"
-      )
-    }
-    
-    // 2. Si categories est une chaîne JSON, la parser
-    if (operation.categories && typeof operation.categories === 'string') {
-      try {
-        const parsed = JSON.parse(operation.categories)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          console.log("Utilisation du champ categories (JSON parsé):", parsed)
-          return parsed.map(cat => 
-            CATEGORY_LABELS[cat ?? ""] ?? cat ?? "Non spécifiée"
-          )
-        }
-      } catch (e) {
-        console.log("Impossible de parser categories comme JSON:", e)
-      }
-    }
-    
-    // 3. Si category est une chaîne avec des virgules, la séparer
-    if (operation.category && typeof operation.category === 'string' && operation.category.includes(',')) {
-      const categories = operation.category
-        .split(',')
-        .map(cat => cat.trim())
-        .filter(cat => cat.length > 0)
-      
-      if (categories.length > 0) {
-        console.log("Utilisation du champ category (séparé par virgules):", categories)
-        return categories.map(cat => 
-          CATEGORY_LABELS[cat ?? ""] ?? cat ?? "Non spécifiée"
-        )
-      }
-    }
-    
-    // 4. Sinon, utiliser category (rétrocompatibilité)
-    const singleCategory = CATEGORY_LABELS[operation.category ?? ""] ?? operation.category ?? "Non spécifiée"
-    console.log("Utilisation du champ category (simple):", singleCategory)
-    return [singleCategory]
-  }
-  
-  const categoryLabels = getCategoryLabels()
-  const hasMultipleCategories = categoryLabels.length > 1
-  console.log("Labels de catégories:", categoryLabels)
-  console.log("Multiple categories?", hasMultipleCategories)
-
-  const subcategories = parseSubcategories(
-    operation.subcategories ?? operation.subcategory
-  )
+  const statusConfig = STATUS_CONFIG[operation.status] ?? STATUS_CONFIG.draft
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-
         {/* Header */}
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Eye className="h-5 w-5" />
-            Détails de l&apos;opération
-          </DialogTitle>
-          <DialogDescription>Référence : {operation.reference}</DialogDescription>
+        <DialogHeader className="pb-2">
+          <div className="flex items-center gap-3">
+            <div className={`h-10 w-10 rounded-full flex items-center justify-center ${statusConfig.bg}`}>
+              <Eye className="h-5 w-5" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl">Détails de l'opération</DialogTitle>
+              <DialogDescription className="flex items-center gap-2 mt-1">
+                <Hash className="h-3 w-3" />
+                Référence : {operation.reference}
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-6">
-
-          {/* Status bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-3">
+        <div className="space-y-6 pt-2">
+          {/* Status & Date */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-muted/30 border">
+            <div className="flex items-center gap-3">
               <Badge
-                className={`flex items-center gap-1.5 px-3 py-1 ${STATUS_COLORS[operation.status] ?? ""}`}
+                variant="outline"
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium ${statusConfig.bg} ${statusConfig.color}`}
               >
-                {getStatusIcon(operation.status)}
-                {getStatusLabel(operation.status)}
+                {statusConfig.icon}
+                {statusConfig.label}
               </Badge>
-              <span className="text-sm text-muted-foreground">
-                Créée le {formatDate(operation.created_at)}
+              <span className="text-sm text-muted-foreground flex items-center gap-1">
+                <Calendar className="h-3.5 w-3.5" />
+                Créée le {formatDateShort(operation.created_at)}
               </span>
             </div>
 
-            {operation.payment_proof_url && (
-              <Button variant="outline" size="sm" asChild>
-                <a href={operation.payment_proof_url} target="_blank" rel="noopener noreferrer">
-                  <Download className="mr-2 h-4 w-4" />
-                  Preuve
+            {operation.status === "paid" && operation.payment_proof_url && (
+              <Button variant="outline" size="sm" className="gap-2" asChild>
+                <a
+                  href={operation.payment_proof_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <Download className="h-4 w-4" />
+                  Télécharger le justificatif
                 </a>
               </Button>
             )}
           </div>
 
+          {/* Workflow Timeline */}
+          <WorkflowTimeline status={operation.status} />
+
           <Separator />
 
-          {/* General + Financial info */}
-          <div className="grid grid-cols-1 gap-1 md:grid-cols-1">
+          {/* Montant en évidence */}
+          <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center">
+                    <DollarSign className="h-7 w-7 text-primary" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Montant total</p>
+                    <p className="text-3xl font-bold text-primary">
+                      {formatCurrency(operation.total_amount)}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm text-muted-foreground">Statut actuel</p>
+                  <p className="text-lg font-medium">{statusConfig.label}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Informations générales */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-muted-foreground">
+          {/* Informations générales */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <ClipboardList className="h-4 w-4 text-blue-600" />
                 Informations générales
-              </h3>
-              <div className="flex justify-between">
-                <span className="text-sm">Tâche</span>
-                <span className="font-medium">{operation.task_name ?? "—"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Période</span>
-                <span className="font-medium">
-                  {PERIOD_LABELS[operation.period ?? ""] ?? operation.period ?? "—"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Demandeur</span>
-                <span className="font-medium">
-                  {operation.requester?.name ?? "Non spécifié"}
-                </span>
-              </div>
-            </div>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-1">
+              <InfoRow
+                icon={<Briefcase className="h-4 w-4 text-blue-600" />}
+                label="Tâche"
+                value={operation.task_name ?? "—"}
+              />
+              <InfoRow
+                icon={<Clock className="h-4 w-4 text-blue-600" />}
+                label="Période"
+                value={
+                  PERIOD_LABELS[operation.period ?? ""] ??
+                  operation.period ??
+                  "—"
+                }
+              />
+              <InfoRow
+                icon={<User className="h-4 w-4 text-blue-600" />}
+                label="Demandeur"
+                value={operation.requester?.name ?? "Non spécifié"}
+              />
+              <InfoRow
+                icon={<Briefcase className="h-4 w-4 text-blue-600" />}
+                label="Projet"
+                value={
+                  operation.project?.name ??
+                  operation.project_name ??
+                  "Non associé"
+                }
+              />
+            </CardContent>
+          </Card>
 
-            {/* Informations financières */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-muted-foreground">
-                Informations financières
-              </h3>
-              <div className="flex justify-between">
-                <span className="text-sm">Montant total</span>
-                <span className="text-lg font-medium">
-                  {formatCurrency(operation.total_amount)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Projet</span>
-                <span className="font-medium">
-                  {operation.project?.name ?? operation.project_name ?? "Non associé"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Catégorie{hasMultipleCategories ? 's' : ''}</span>
-                <span className="font-medium text-right max-w-[60%]">
-                  {hasMultipleCategories ? (
-                    <div className="flex flex-wrap gap-1 justify-end">
-                      {categoryLabels.map((label, index) => (
-                        <Badge key={index} variant="outline" className="text-xs">
-                          {label}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    categoryLabels[0]
-                  )}
-                </span>
-              </div>
-            </div>
-          </div>
+          {/* Devis joint */}
+          {operation.quote_url && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-blue-600" />
+                  Devis joint
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Button variant="outline" size="sm" className="gap-2" asChild>
+                  <a
+                    href={operation.quote_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Download className="h-4 w-4" />
+                    Télécharger le devis
+                  </a>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Validation & Paiement */}
           {["validated", "paid", "rejected"].includes(operation.status) && (
-            <>
-              <Separator />
-              <div className="space-y-3">
-                <h3 className="text-sm font-medium text-muted-foreground">
-                  Validation &amp; Paiement
-                </h3>
-
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                  Validation & Paiement
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-1">
                 {operation.validated_by?.name && (
-                  <div className="flex justify-between">
-                    <span className="text-sm">Validé par</span>
-                    <span className="font-medium">{operation.validated_by.name}</span>
-                  </div>
+                  <InfoRow
+                    icon={<User className="h-4 w-4 text-green-600" />}
+                    label="Validé par"
+                    value={operation.validated_by.name}
+                  />
                 )}
                 {operation.validation_date && (
-                  <div className="flex justify-between">
-                    <span className="text-sm">Date de validation</span>
-                    <span className="font-medium">{formatDate(operation.validation_date)}</span>
-                  </div>
+                  <InfoRow
+                    icon={<Calendar className="h-4 w-4 text-green-600" />}
+                    label="Date de validation"
+                    value={formatDate(operation.validation_date)}
+                  />
                 )}
-                {operation.status === "paid" && operation.payment_proof && (
-                  <div className="flex justify-between">
-                    <span className="text-sm">Preuve de paiement</span>
-                    <span className="font-medium">Disponible</span>
-                  </div>
-                )}
+               
+              
                 {operation.status === "rejected" && operation.rejection_reason && (
-                  <div className="flex justify-between">
-                    <span className="text-sm">Raison du rejet</span>
-                    <span className="font-medium text-destructive">
-                      {operation.rejection_reason}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-
-          {/* Sous-catégories */}
-          {(operation.subcategory || operation.subcategories) && (
-            <>
-              <Separator />
-              <div className="rounded-md bg-muted/30 p-3 space-y-2">
-                {subcategories.length === 0 ? (
-                  <p className="py-2 text-center text-sm text-muted-foreground">
-                    Aucune sous-catégorie avec montant spécifié
-                  </p>
-                ) : (
-                  <>
-                    {/* Résumé catégorie */}
-                    <div className="mb-4 rounded-md bg-blue-50 dark:bg-blue-900/20 px-3 py-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-blue-700 dark:text-blue-300">
-                          {hasMultipleCategories ? (
-                            <div className="flex flex-wrap gap-1">
-                              {categoryLabels.map((label, index) => (
-                                <span key={index} className="inline-flex items-center">
-                                  {label}
-                                  {index < categoryLabels.length - 1 && <span className="mx-1">+</span>}
-                                </span>
-                              ))}
-                            </div>
-                          ) : (
-                            categoryLabels[0]
-                          )} :
-                        </span>
-                        <span className="text-lg font-bold text-blue-700 dark:text-blue-300">
-                          {formatCurrency(operation.total_amount)}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                        Ce montant correspond à la somme des sous-catégories ci-dessous
+                  <div className="flex items-start gap-3 p-3 rounded-lg bg-red-500/10 border border-red-200">
+                    <div className="h-8 w-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Raison du rejet</p>
+                      <p className="text-sm font-medium text-red-700">
+                        {operation.rejection_reason}
                       </p>
                     </div>
-
-                    {/* Liste */}
-                    <div className="divide-y">
-                      {subcategories.map((item, index) => (
-                        <div
-                          key={`${item.name}-${index}`}
-                          className="flex items-center justify-between py-2"
-                        >
-                          <span className="text-sm">{item.name ?? "Sous-catégorie"}</span>
-                          <span className="font-semibold text-sm">
-                            {formatCurrency(item.amount ?? 0)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
+                  </div>
                 )}
-              </div>
-            </>
+              </CardContent>
+            </Card>
           )}
 
           {/* Description */}
           {operation.description && (
-            <>
-              <Separator />
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-muted-foreground">Description</h3>
-                <div className="rounded-md bg-muted/30 p-3">
-                  <p className="whitespace-pre-wrap text-sm">{operation.description}</p>
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-orange-600" />
+                  Description
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="rounded-lg bg-muted/30 p-4 border">
+                  <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                    {operation.description}
+                  </p>
                 </div>
-              </div>
-            </>
+              </CardContent>
+            </Card>
           )}
 
           {/* Métadonnées */}
-          <Separator />
-          <div className="grid grid-cols-1 gap-2 text-xs text-muted-foreground sm:grid-cols-2">
-            <div><span className="font-medium">ID :</span> {operation.id}</div>
-            <div>
-              <span className="font-medium">Dernière mise à jour :</span>{" "}
-              {formatDate(operation.updated_at)}
+          <div className="flex items-center justify-between p-4 rounded-xl bg-muted/20 border text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <Hash className="h-3 w-3" />
+              <span>
+                <span className="font-medium">ID :</span> {operation.id}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <RotateCcw className="h-3 w-3" />
+              <span>
+                <span className="font-medium">Dernière mise à jour :</span>{" "}
+                {formatDateShort(operation.updated_at)}
+              </span>
             </div>
           </div>
-
         </div>
       </DialogContent>
     </Dialog>

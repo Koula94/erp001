@@ -23,7 +23,6 @@ export function WarehousesTab() {
     try {
       setLoading(true)
       const response = await api.warehouses.list() as any
-      console.log("Warehouses API response:", response)
       // Handle different response formats
       const data = Array.isArray(response) ? response : 
                    (response as any)?.results || (response as any)?.data || []

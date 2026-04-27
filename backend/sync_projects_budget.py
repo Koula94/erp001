@@ -14,10 +14,16 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sofixe_erp.settings')
 django.setup()
 
 from projects.models import Project
-from finance.models import Expense, Invoice
+from finance.models import OperationRequest
 
 def sync_all_projects_budget():
-    """Synchronise le budget de tous les projets avec les données finance"""
+    """Synchronise le budget de tous les projets avec les données finance.
+    
+    Logique:
+    - Le budget du projet (project.budget) est utilisé par les opérations
+    - Quand une opération est payée, elle déduit du budget projet (project.spent)
+    - Les dépenses sont prélevées sur la caisse des opérations, PAS sur le budget projet
+    """
     projects = Project.objects.all()
     print(f"Synchronisation du budget pour {projects.count()} projets...")
     
@@ -28,25 +34,22 @@ def sync_all_projects_budget():
         print(f"Budget total: ${project.budget}")
         print(f"Dépensé actuel: ${project.spent}")
         
-        # Calculer le montant réel dépensé
+        # Calculer le montant réel dépensé (basé uniquement sur les opérations payées)
         real_spent = project.calculate_spent_from_finance()
         budget_used = (real_spent / project.budget) * 100 if project.budget > 0 else 0
         budget_status = project.get_budget_status()
         budget_risk = project.get_budget_risk_level()
         
-        print(f"Dépensé réel (calculé): ${real_spent}")
+        print(f"Dépensé réel (calculé via opérations payées): ${real_spent}")
         print(f"Budget utilisé: {budget_used:.1f}%")
         print(f"Statut budget: {budget_status}")
         print(f"Risque budget: {budget_risk}")
         
-        # Compter les dépenses et factures
-        expenses_count = Expense.objects.filter(project=project).count()
-        approved_expenses_count = Expense.objects.filter(project=project, status='approved').count()
-        invoices_count = Invoice.objects.filter(project=project).count()
-        paid_invoices_count = Invoice.objects.filter(project=project, status='paid').count()
+        # Compter les opérations
+        operations_count = OperationRequest.objects.filter(project=project).count()
+        paid_operations_count = OperationRequest.objects.filter(project=project, status='paid').count()
         
-        print(f"Dépenses totales: {expenses_count} (approuvées: {approved_expenses_count})")
-        print(f"Factures totales: {invoices_count} (payées: {paid_invoices_count})")
+        print(f"Opérations totales: {operations_count} (payées: {paid_operations_count})")
         
         # Synchroniser
         finance_sync_result = project.sync_with_finance()

@@ -35,42 +35,42 @@ export function ReportsTab() {
       const mockReports: FinancialReport[] = [
         {
           id: "1",
-          name: "Profit & Loss Statement",
+          name: "Compte de Résultat",
           type: "profit_loss",
           period: "Q1 2024",
           generated_at: "2024-03-31T23:59:59Z",
-          status: "completed",
+          status: "Terminé",
         },
         {
           id: "2",
-          name: "Cash Flow Report",
+          name: "Flux de Trésorerie",
           type: "cash_flow",
           period: "Q1 2024",
           generated_at: "2024-03-31T23:59:59Z",
-          status: "completed",
+          status: "Terminé",
         },
         {
           id: "3",
-          name: "Revenue Analysis",
+          name: "Analyse des Revenus",
           type: "revenue",
-          period: "March 2024",
+          period: "Mars 2024",
           generated_at: "2024-03-31T23:59:59Z",
-          status: "completed",
+          status: "Terminé",
         },
         {
           id: "4",
-          name: "Expense Breakdown",
+          name: "Répartition des Dépenses",
           type: "expenses",
           period: "Q1 2024",
           generated_at: "2024-03-31T23:59:59Z",
-          status: "completed",
+          status: "Terminé",
         },
       ]
       setReports(mockReports)
       setError(null)
     } catch (err) {
-      setError("Failed to load reports")
-      console.error("Error loading reports:", err)
+      setError("Échec du chargement des rapports")
+      console.error("Erreur lors du chargement des rapports :", err)
     } finally {
       setLoading(false)
     }
@@ -79,24 +79,24 @@ export function ReportsTab() {
   const handleGenerateReport = async (reportType: string) => {
     try {
       // This would call the API to generate a new report
-      console.log(`Generating ${reportType} report...`)
+      console.log(`Génération du rapport ${reportType}...`)
       // For now, we'll just show a success message
-      alert(`Report generation started for ${reportType}. This may take a few minutes.`)
+      alert(`Génération du rapport ${reportType} démarrée. Cela peut prendre quelques minutes.`)
     } catch (err) {
-      setError("Failed to generate report")
-      console.error("Error generating report:", err)
+      setError("Échec de la génération du rapport")
+      console.error("Erreur lors de la génération du rapport :", err)
     }
   }
 
   const handleDownloadReport = async (reportId: string) => {
     try {
       // This would call the API to download the report
-      console.log(`Downloading report ${reportId}...`)
+      console.log(`Téléchargement du rapport ${reportId}...`)
       // For now, we'll just show a success message
-      alert("Report download started. Check your downloads folder.")
+      alert("Téléchargement du rapport démarré. Vérifiez votre dossier de téléchargements.")
     } catch (err) {
-      setError("Failed to download report")
-      console.error("Error downloading report:", err)
+      setError("Échec du téléchargement du rapport")
+      console.error("Erreur lors du téléchargement du rapport :", err)
     }
   }
 
@@ -133,7 +133,7 @@ export function ReportsTab() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold mb-4">Generate New Reports</h2>
+        <h2 className="text-xl font-semibold mb-4">Générer de Nouveaux Rapports</h2>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <Card className="cursor-pointer hover:shadow-md transition-shadow">
             <CardContent className="pt-6">
@@ -142,15 +142,15 @@ export function ReportsTab() {
                   <TrendingUp className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Profit & Loss</h3>
-                  <p className="text-sm text-muted-foreground">Income vs Expenses</p>
+                  <h3 className="font-medium">Compte de Résultat</h3>
+                  <p className="text-sm text-muted-foreground">Revenus vs Dépenses</p>
                 </div>
                 <Button 
                   size="sm" 
                   onClick={() => handleGenerateReport("profit_loss")}
                   className="w-full"
                 >
-                  Generate
+                  Générer
                 </Button>
               </div>
             </CardContent>
@@ -163,15 +163,15 @@ export function ReportsTab() {
                   <DollarSign className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Cash Flow</h3>
-                  <p className="text-sm text-muted-foreground">Cash movements</p>
+                  <h3 className="font-medium">Flux de Trésorerie</h3>
+                  <p className="text-sm text-muted-foreground">Mouvements de trésorerie</p>
                 </div>
                 <Button 
                   size="sm" 
                   onClick={() => handleGenerateReport("cash_flow")}
                   className="w-full"
                 >
-                  Generate
+                  Générer
                 </Button>
               </div>
             </CardContent>
@@ -184,15 +184,15 @@ export function ReportsTab() {
                   <BarChart3 className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Revenue Analysis</h3>
-                  <p className="text-sm text-muted-foreground">Revenue trends</p>
+                  <h3 className="font-medium">Analyse des Revenus</h3>
+                  <p className="text-sm text-muted-foreground">Tendances des revenus</p>
                 </div>
                 <Button 
                   size="sm" 
                   onClick={() => handleGenerateReport("revenue")}
                   className="w-full"
                 >
-                  Generate
+                  Générer
                 </Button>
               </div>
             </CardContent>
@@ -205,15 +205,15 @@ export function ReportsTab() {
                   <PieChart className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                 </div>
                 <div>
-                  <h3 className="font-medium">Expense Breakdown</h3>
-                  <p className="text-sm text-muted-foreground">Expense categories</p>
+                  <h3 className="font-medium">Répartition des Dépenses</h3>
+                  <p className="text-sm text-muted-foreground">Catégories de dépenses</p>
                 </div>
                 <Button 
                   size="sm" 
                   onClick={() => handleGenerateReport("expenses")}
                   className="w-full"
                 >
-                  Generate
+                  Générer
                 </Button>
               </div>
             </CardContent>
@@ -223,8 +223,8 @@ export function ReportsTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Generated Reports</CardTitle>
-          <CardDescription>View and download previously generated financial reports</CardDescription>
+          <CardTitle>Rapports Générés</CardTitle>
+          <CardDescription>Consultez et téléchargez les rapports financiers précédemment générés</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -234,18 +234,18 @@ export function ReportsTab() {
           ) : reports.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>No reports found</p>
-              <p className="text-sm">Generate your first report to get started</p>
+              <p>Aucun rapport trouvé</p>
+              <p className="text-sm">Générez votre premier rapport pour commencer</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Report Name</TableHead>
+                  <TableHead>Nom du Rapport</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Period</TableHead>
-                  <TableHead>Generated</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Période</TableHead>
+                  <TableHead>Généré le</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -282,7 +282,7 @@ export function ReportsTab() {
                         onClick={() => handleDownloadReport(report.id)}
                       >
                         <Download className="h-4 w-4 mr-1" />
-                        Download
+                        Télécharger
                       </Button>
                     </TableCell>
                   </TableRow>

@@ -118,11 +118,20 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
     const result = await withErrorHandling(async () => {
       let updatedProject: Project
       
+      // Convertir les champs string en nombres pour l'API Django
+      const apiData = {
+        ...projectData,
+        client: Number(projectData.client),
+        budget: Number(projectData.budget),
+        manager: Number(projectData.manager),
+        team: projectData.team?.map((t: string) => Number(t)) || [],
+      }
+      
       if (editingProject) {
-        updatedProject = await api.projects.update(editingProject.id, projectData) as Project
+        updatedProject = await api.projects.update(editingProject.id, apiData) as Project
         setProjects(projects.map((p) => (p.id === editingProject.id ? updatedProject : p)))
       } else {
-        updatedProject = await api.projects.create(projectData) as Project
+        updatedProject = await api.projects.create(apiData) as Project
         setProjects([...projects, updatedProject])
       }
       
@@ -245,7 +254,7 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
                 </div>
 
                 {/* Alertes de cohérence */}
-                {!validation.isValid && (
+                {/* {!validation.isValid && (
                   <div className="bg-red-50 border border-red-200 rounded-md p-3">
                     <div className="flex items-start gap-2">
                       <AlertCircle className="h-4 w-4 text-red-600 mt-0.5" />
@@ -259,7 +268,7 @@ export function ProjectsOverview({ onSelectProject }: ProjectsOverviewProps) {
                       </div>
                     </div>
                   </div>
-                )}
+                )} */}
               </CardContent>
             </Card>
           )

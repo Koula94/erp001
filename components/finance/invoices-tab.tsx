@@ -37,10 +37,10 @@ interface InvoiceItem {
 interface Invoice {
   id: string
   invoice_number: string
-  client: number  // ID du client
-  client_name: string  // Nom du client depuis le sérialiseur
-  project?: number  // ID du projet (peut être null)
-  project_name?: string  // Nom du projet depuis le sérialiseur
+  client: number
+  client_name: string
+  project?: number
+  project_name?: string
   amount: number
   status: string
   due_date: string
@@ -94,14 +94,14 @@ export function InvoicesTab() {
       setInvoices(data as Invoice[])
       setError(null)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to load invoices"
+      const errorMessage = err instanceof Error ? err.message : "Échec du chargement des factures"
       setError(errorMessage)
       toast({
-        title: "Error loading invoices",
+        title: "Erreur lors du chargement des factures",
         description: errorMessage,
         variant: "destructive",
       })
-      console.error("Error loading invoices:", err)
+      console.error("Erreur lors du chargement des factures :", err)
     } finally {
       setLoading(false)
     }
@@ -140,7 +140,7 @@ export function InvoicesTab() {
       
       // Validation des données obligatoires
       if (!invoiceData.clientId) {
-        throw new Error("Client is required")
+        throw new Error("Le client est obligatoire")
       }
       
       const totalAmount = invoiceData.items.reduce((sum: number, item: any) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0), 0)
@@ -182,8 +182,8 @@ export function InvoicesTab() {
         const updatedInvoice = await api.invoices.update(editingInvoice.id, updateData) as Invoice
         setInvoices(invoices.map((i) => (i.id === editingInvoice.id ? updatedInvoice : i)))
         toast({
-          title: "Invoice updated",
-          description: `Invoice ${updatedInvoice.invoice_number} has been updated successfully.`,
+          title: "Facture mise à jour",
+          description: `La facture ${updatedInvoice.invoice_number} a été mise à jour avec succès.`,
         })
       } else {
         // Create new invoice
@@ -207,17 +207,17 @@ export function InvoicesTab() {
         const newInvoice = await api.invoices.create(createData) as Invoice
         setInvoices([...invoices, newInvoice])
         toast({
-          title: "Invoice created",
-          description: `Invoice ${newInvoice.invoice_number} has been created successfully.`,
+          title: "Facture créée",
+          description: `La facture ${newInvoice.invoice_number} a été créée avec succès.`,
         })
       }
       setIsFormOpen(false)
       setEditingInvoice(null)
     } catch (err) {
-      console.error("Error saving invoice:", err)
+      console.error("Erreur lors de l'enregistrement de la facture :", err)
       
       // Improved error handling
-      let errorMessage = "Failed to save invoice"
+      let errorMessage = "Échec de l'enregistrement de la facture"
       
       if (err instanceof Error) {
         errorMessage = err.message
@@ -243,7 +243,7 @@ export function InvoicesTab() {
       }
       
       toast({
-        title: "Error saving invoice",
+        title: "Erreur lors de l'enregistrement de la facture",
         description: errorMessage,
         variant: "destructive",
       })
@@ -265,17 +265,17 @@ export function InvoicesTab() {
       setInvoices(invoices.filter((i) => i.id !== invoiceId))
       setDeletingInvoiceId(null)
       toast({
-        title: "Invoice deleted",
-        description: `Invoice ${deletedInvoice?.invoice_number || invoiceId} has been deleted successfully.`,
+        title: "Facture supprimée",
+        description: `La facture ${deletedInvoice?.invoice_number || invoiceId} a été supprimée avec succès.`,
       })
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to delete invoice"
+      const errorMessage = err instanceof Error ? err.message : "Échec de la suppression de la facture"
       toast({
-        title: "Error deleting invoice",
+        title: "Erreur lors de la suppression de la facture",
         description: errorMessage,
         variant: "destructive",
       })
-      console.error("Error deleting invoice:", err)
+      console.error("Erreur lors de la suppression de la facture :", err)
     } finally {
       setDeleting(false)
     }
@@ -289,7 +289,7 @@ export function InvoicesTab() {
     })
     
     // TODO: Implement a proper invoice preview dialog
-    console.log("Invoice details:", invoice)
+    console.log("Détails de la facture :", invoice)
   }
 
   const handleDownloadInvoice = useCallback(async (invoice: Invoice) => {
@@ -302,7 +302,7 @@ export function InvoicesTab() {
       })
       
       if (!response.ok) {
-        throw new Error('Failed to download PDF')
+        throw new Error('Échec du téléchargement du PDF')
       }
       
       const blob = await response.blob()
@@ -310,7 +310,7 @@ export function InvoicesTab() {
       const a = document.createElement('a')
       a.style.display = 'none'
       a.href = url
-      a.download = `invoice_${invoice.invoice_number}.pdf`
+      a.download = `facture_${invoice.invoice_number}.pdf`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
@@ -322,9 +322,9 @@ export function InvoicesTab() {
       })
       
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to download PDF"
+      const errorMessage = err instanceof Error ? err.message : "Échec du téléchargement du PDF"
       toast({
-        title: "Error downloading PDF",
+        title: "Erreur lors du téléchargement du PDF",
         description: errorMessage,
         variant: "destructive",
       })
@@ -337,7 +337,7 @@ export function InvoicesTab() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search invoices..."
+            placeholder="Rechercher des factures..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-8"
@@ -350,7 +350,7 @@ export function InvoicesTab() {
           }}
         >
           <Plus className="mr-2 h-4 w-4" />
-          Create Invoice
+          Créer une Facture
         </Button>
       </div>
 
@@ -367,7 +367,7 @@ export function InvoicesTab() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Invoices</p>
+                  <p className="text-sm font-medium text-muted-foreground">Total des Factures</p>
                   <p className="text-2xl font-bold">{invoiceStats.totalInvoices}</p>
                 </div>
                 <FileText className="h-8 w-8 text-blue-500" />
@@ -378,7 +378,7 @@ export function InvoicesTab() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Total Amount</p>
+                  <p className="text-sm font-medium text-muted-foreground">Montant Total</p>
                   <p className="text-2xl font-bold">GNF{invoiceStats.totalAmount.toLocaleString()}</p>
                 </div>
                 <div className="h-8 w-8 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
@@ -391,11 +391,11 @@ export function InvoicesTab() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Paid</p>
+                  <p className="text-sm font-medium text-muted-foreground">Payées</p>
                   <p className="text-2xl font-bold text-green-600">{invoiceStats.paidInvoices}</p>
                 </div>
                 <Badge variant="outline" className="bg-green-500/10 text-green-700">
-                  Paid
+                  Payée
                 </Badge>
               </div>
             </CardContent>
@@ -404,11 +404,11 @@ export function InvoicesTab() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Overdue</p>
+                  <p className="text-sm font-medium text-muted-foreground">En Retard</p>
                   <p className="text-2xl font-bold text-red-600">{invoiceStats.overdueInvoices}</p>
                 </div>
                 <Badge variant="outline" className="bg-red-500/10 text-red-700">
-                  Overdue
+                  En Retard
                 </Badge>
               </div>
             </CardContent>
@@ -418,8 +418,8 @@ export function InvoicesTab() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Invoices</CardTitle>
-          <CardDescription>Manage client invoices and payments</CardDescription>
+          <CardTitle>Factures</CardTitle>
+          <CardDescription>Gérez les factures clients et les paiements</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -429,19 +429,19 @@ export function InvoicesTab() {
           ) : filteredInvoices.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>{searchQuery ? "No invoices found matching your search" : "No invoices found"}</p>
-              <p className="text-sm">Create your first invoice to get started</p>
+              <p>{searchQuery ? "Aucune facture ne correspond à votre recherche" : "Aucune facture trouvée"}</p>
+              <p className="text-sm">Créez votre première facture pour commencer</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Invoice ID</TableHead>
+                  <TableHead>N° Facture</TableHead>
                   <TableHead>Client</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Due Date</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Projet</TableHead>
+                  <TableHead>Montant</TableHead>
+                  <TableHead>Date d'Échéance</TableHead>
+                  <TableHead>Statut</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -464,7 +464,7 @@ export function InvoicesTab() {
                           variant="ghost" 
                           size="icon" 
                           onClick={() => handleViewInvoice(invoice)}
-                          title="View invoice"
+                          title="Voir la facture"
                         >
                           <Eye className="h-4 w-4" />
                         </Button>
@@ -472,7 +472,7 @@ export function InvoicesTab() {
                           variant="ghost" 
                           size="icon" 
                           onClick={() => handleDownloadInvoice(invoice)}
-                          title="Download PDF"
+                          title="Télécharger le PDF"
                         >
                           <Download className="h-4 w-4" />
                         </Button>
@@ -480,7 +480,7 @@ export function InvoicesTab() {
                           variant="ghost" 
                           size="icon" 
                           onClick={() => handleEditInvoice(invoice)}
-                          title="Edit invoice"
+                          title="Modifier la facture"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -488,7 +488,7 @@ export function InvoicesTab() {
                           variant="ghost" 
                           size="icon" 
                           onClick={() => setDeletingInvoiceId(invoice.id)}
-                          title="Delete invoice"
+                          title="Supprimer la facture"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -526,15 +526,15 @@ export function InvoicesTab() {
       <AlertDialog open={!!deletingInvoiceId} onOpenChange={() => setDeletingInvoiceId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this invoice. This action cannot be undone.
+              Cette action supprimera définitivement cette facture. Cette action est irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
             <AlertDialogAction onClick={() => deletingInvoiceId && handleDeleteInvoice(deletingInvoiceId)}>
-              Delete
+              Supprimer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

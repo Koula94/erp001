@@ -46,54 +46,54 @@ export function BudgetFormDialog({ open, onOpenChange, onSubmit, initialData }: 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{initialData ? "Edit Budget" : "Create New Budget"}</DialogTitle>
+          <DialogTitle>{initialData ? "Modifier le Budget" : "Créer un Nouveau Budget"}</DialogTitle>
           <DialogDescription>
-            {initialData ? "Update budget information" : "Create a new budget allocation"}
+            {initialData ? "Mettre à jour les informations du budget" : "Créer une nouvelle allocation budgétaire"}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Budget Name *</Label>
+              <Label htmlFor="name">Nom du Budget *</Label>
               <Input
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Q1 2024 Operations"
+                placeholder="ex. : Opérations Q1 2024"
                 required
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="category">Category *</Label>
+                <Label htmlFor="category">Catégorie *</Label>
                 <Select
                   value={formData.category}
                   onValueChange={(value) => setFormData({ ...formData, category: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder="Sélectionner une catégorie" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Operations">Operations</SelectItem>
-                    <SelectItem value="Projects">Projects</SelectItem>
+                    <SelectItem value="Operations">Opérations</SelectItem>
+                    <SelectItem value="Projects">Projets</SelectItem>
                     <SelectItem value="Marketing">Marketing</SelectItem>
-                    <SelectItem value="HR">HR</SelectItem>
-                    <SelectItem value="Equipment">Equipment</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
+                    <SelectItem value="HR">RH</SelectItem>
+                    <SelectItem value="Equipment">Équipement</SelectItem>
+                    <SelectItem value="Other">Autre</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="period">Period *</Label>
+                <Label htmlFor="period">Période *</Label>
                 <Select value={formData.period} onValueChange={(value) => setFormData({ ...formData, period: value })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select period" />
+                    <SelectValue placeholder="Sélectionner une période" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Monthly">Monthly</SelectItem>
-                    <SelectItem value="Quarterly">Quarterly</SelectItem>
-                    <SelectItem value="Yearly">Yearly</SelectItem>
+                    <SelectItem value="Monthly">Mensuel</SelectItem>
+                    <SelectItem value="Quarterly">Trimestriel</SelectItem>
+                    <SelectItem value="Yearly">Annuel</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -101,7 +101,7 @@ export function BudgetFormDialog({ open, onOpenChange, onSubmit, initialData }: 
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="allocated">Allocated Amount ($) *</Label>
+                <Label htmlFor="allocated">Montant Alloué ($) *</Label>
                 <Input
                   id="allocated"
                   type="number"
@@ -112,7 +112,7 @@ export function BudgetFormDialog({ open, onOpenChange, onSubmit, initialData }: 
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="spent">Spent Amount ($)</Label>
+                <Label htmlFor="spent">Montant Dépensé ($)</Label>
                 <Input
                   id="spent"
                   type="number"
@@ -125,7 +125,7 @@ export function BudgetFormDialog({ open, onOpenChange, onSubmit, initialData }: 
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startDate">Start Date *</Label>
+                <Label htmlFor="startDate">Date de Début *</Label>
                 <Input
                   id="startDate"
                   type="date"
@@ -135,7 +135,7 @@ export function BudgetFormDialog({ open, onOpenChange, onSubmit, initialData }: 
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="endDate">End Date *</Label>
+                <Label htmlFor="endDate">Date de Fin *</Label>
                 <Input
                   id="endDate"
                   type="date"
@@ -148,9 +148,9 @@ export function BudgetFormDialog({ open, onOpenChange, onSubmit, initialData }: 
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              Annuler
             </Button>
-            <Button type="submit">{initialData ? "Update" : "Create"} Budget</Button>
+            <Button type="submit">{initialData ? "Mettre à jour" : "Créer"} le Budget</Button>
           </DialogFooter>
         </form>
       </DialogContent>

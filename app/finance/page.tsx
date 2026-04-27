@@ -7,30 +7,31 @@ import { ExpensesTab } from "@/components/finance/expenses-tab"
 import { BudgetsTab } from "@/components/finance/budgets-tab"
 import { ReportsTab } from "@/components/finance/reports-tab"
 import { OperationsTab } from "@/components/finance/operations-tab"
-import { OperationsDashboard } from "@/components/finance/operations-dashboard"
 import { FinanceOverview } from "@/components/finance/finance-overview"
 
 export default function FinancePage() {
-  const [activeTab, setActiveTab] = useState("operations-dashboard")
+  const [activeTab, setActiveTab] = useState("dashboard")
 
   return (
     <div className="flex flex-col gap-6 p-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Finance & Accounting</h1>
-        <p className="text-muted-foreground">Manage invoices, expenses, budgets and financial reports</p>
+        <h1 className="text-3xl font-bold tracking-tight">Finance & Comptabilité</h1>
+        <p className="text-muted-foreground">Gérez les factures, dépenses, budgets et rapports financiers de SOFIXE PLUS</p>
       </div>
-
-      <FinanceOverview />
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
-          <TabsTrigger value="invoices">Invoices</TabsTrigger>
-          <TabsTrigger value="expenses">Expenses</TabsTrigger>
-          <TabsTrigger value="operations-dashboard">Operations Dashboard</TabsTrigger>
-          <TabsTrigger value="operations-list">Operations List</TabsTrigger>
+          <TabsTrigger value="dashboard">Tableau de bord</TabsTrigger>
+          <TabsTrigger value="invoices">Factures</TabsTrigger>
+          <TabsTrigger value="expenses">Dépenses</TabsTrigger>
+          <TabsTrigger value="operations-list">Liste des Opérations</TabsTrigger>
           <TabsTrigger value="budgets">Budgets</TabsTrigger>
-          <TabsTrigger value="reports">Reports</TabsTrigger>
+          <TabsTrigger value="reports">Rapports</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="dashboard" className="mt-6">
+          <FinanceOverview />
+        </TabsContent>
 
         <TabsContent value="invoices" className="mt-6">
           <InvoicesTab />
@@ -38,10 +39,6 @@ export default function FinancePage() {
 
         <TabsContent value="expenses" className="mt-6">
           <ExpensesTab />
-        </TabsContent>
-
-        <TabsContent value="operations-dashboard" className="mt-6">
-          <OperationsDashboard />
         </TabsContent>
 
         <TabsContent value="operations-list" className="mt-6">

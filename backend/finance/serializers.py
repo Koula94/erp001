@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Invoice, InvoiceItem, Expense, Budget, OperationRequest, OperationSubcategory
+from .models import Invoice, InvoiceItem, Expense, Budget, OperationRequest
+
 
 class InvoiceItemSerializer(serializers.ModelSerializer):
     unit_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=True)
@@ -49,6 +50,7 @@ class ExpenseSerializer(serializers.ModelSerializer):
     submitted_by_name = serializers.CharField(source='submitted_by.get_full_name', read_only=True)
     approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
     linked_disbursement_reference = serializers.CharField(source='linked_disbursement.description', read_only=True)
+    receipt_url = serializers.SerializerMethodField()
     
     class Meta:
         model = Expense
@@ -60,12 +62,43 @@ class ExpenseSerializer(serializers.ModelSerializer):
             'fund_source': {'required': False, 'allow_blank': True},
             'linked_disbursement': {'required': False, 'allow_null': True},
             'cash_withdrawal_date': {'required': False, 'allow_null': True},
+            'receipt': {'write_only': True},
         }
+    
+    def get_receipt_url(self, obj):
+        """Retourne l'URL complète du reçu/justificatif"""
+        if obj.receipt and hasattr(obj.receipt, 'url'):
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.receipt.url)
+            return obj.receipt.url
+        return None
+    
+    def to_representation(self, instance):
+        """Surcharge pour que project soit un objet {id, name} au lieu d'un simple ID"""
+        representation = super().to_representation(instance)
+        if instance.project:
+            representation['project'] = {
+                'id': str(instance.project.id),
+                'name': instance.project.name
+            }
+        else:
+            representation['project'] = None
+        return representation
     
     def validate_subcategories(self, value):
         """Validation personnalisée pour le champ subcategories"""
+        import json
+        
         if value is None:
             return []
+        
+        # Si c'est une chaîne JSON (venant de FormData), la parser
+        if isinstance(value, str):
+            try:
+                value = json.loads(value)
+            except (json.JSONDecodeError, TypeError):
+                raise serializers.ValidationError("Le champ subcategories doit être une liste JSON valide")
         
         if not isinstance(value, list):
             raise serializers.ValidationError("Le champ subcategories doit être une liste")
@@ -124,16 +157,68 @@ class OperationRequestSerializer(serializers.ModelSerializer):
     requester_name = serializers.CharField(source='requester.get_full_name', read_only=True)
     validated_by_name = serializers.CharField(source='validated_by.get_full_name', read_only=True)
     workflow_status = serializers.CharField(source='get_workflow_status', read_only=True)
-    payment_proof_url = serializers.FileField(source='payment_proof', read_only=True)
+    payment_proof_url = serializers.SerializerMethodField()
+    quote_url = serializers.SerializerMethodField()
     
     class Meta:
         model = OperationRequest
         fields = '__all__'
         read_only_fields = ['reference', 'request_date', 'created_at', 'updated_at']
         extra_kwargs = {
-            'category': {'required': False, 'allow_blank': True},
-            'subcategory': {'required': False, 'allow_blank': True},
+            'payment_proof': {'write_only': True},
+            'quote': {'write_only': True},
         }
+    
+    def get_payment_proof_url(self, obj):
+        """Retourne l'URL complète du justificatif de paiement"""
+        if obj.payment_proof and hasattr(obj.payment_proof, 'url'):
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.payment_proof.url)
+            return obj.payment_proof.url
+        return None
+    
+    def get_quote_url(self, obj):
+        """Retourne l'URL complète du devis joint"""
+        if obj.quote and hasattr(obj.quote, 'url'):
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.quote.url)
+            return obj.quote.url
+        return None
+    
+    def to_representation(self, instance):
+        """Surcharge pour que project et requester soient des objets au lieu de simples IDs"""
+        representation = super().to_representation(instance)
+        
+        # Projet en objet {id, name}
+        if instance.project:
+            representation['project'] = {
+                'id': str(instance.project.id),
+                'name': instance.project.name
+            }
+        else:
+            representation['project'] = None
+        
+        # Requester en objet {id, name}
+        if instance.requester:
+            representation['requester'] = {
+                'id': str(instance.requester.id),
+                'name': instance.requester.get_full_name() or instance.requester.username
+            }
+        else:
+            representation['requester'] = None
+        
+        # Validated_by en objet {id, name}
+        if instance.validated_by:
+            representation['validated_by'] = {
+                'id': str(instance.validated_by.id),
+                'name': instance.validated_by.get_full_name() or instance.validated_by.username
+            }
+        else:
+            representation['validated_by'] = None
+        
+        return representation
     
     def validate(self, data):
         """Validation personnalisée pour les demandes d'opération"""
@@ -156,83 +241,3 @@ class OperationRequestSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
-class OperationSubcategorySerializer(serializers.ModelSerializer):
-    """Sérialiseur pour les sous-catégories d'opération"""
-    class Meta:
-        model = OperationSubcategory
-        fields = ['id', 'name', 'amount', 'created_at', 'updated_at']
-        read_only_fields = ['id', 'created_at', 'updated_at']
-
-
-class OperationRequestWithSubcategoriesSerializer(serializers.ModelSerializer):
-    """Sérialiseur pour OperationRequest avec sous-catégories imbriquées"""
-    project_name = serializers.CharField(source='project.name', read_only=True)
-    requester_name = serializers.CharField(source='requester.get_full_name', read_only=True)
-    validated_by_name = serializers.CharField(source='validated_by.get_full_name', read_only=True)
-    workflow_status = serializers.CharField(source='get_workflow_status', read_only=True)
-    payment_proof_url = serializers.FileField(source='payment_proof', read_only=True)
-    subcategories = OperationSubcategorySerializer(many=True, required=False)
-    
-    class Meta:
-        model = OperationRequest
-        fields = '__all__'
-        read_only_fields = ['reference', 'request_date', 'created_at', 'updated_at']
-        extra_kwargs = {
-            'category': {'required': False, 'allow_blank': True},
-            'subcategory': {'required': False, 'allow_blank': True},
-        }
-    
-    def validate(self, data):
-        """Validation personnalisée pour les demandes d'opération"""
-        # Vérifier que le nom de tâche est fourni
-        if 'task_name' in data and not data['task_name'].strip():
-            raise serializers.ValidationError({"task_name": "Le nom de la tâche est obligatoire"})
-        
-        # Vérifier que le montant est positif
-        if 'total_amount' in data and data['total_amount'] <= 0:
-            raise serializers.ValidationError({"total_amount": "Le montant doit être supérieur à 0"})
-        
-        return data
-    
-    def create(self, validated_data):
-        """Création d'une demande d'opération avec sous-catégories"""
-        subcategories_data = validated_data.pop('subcategories', [])
-        request = self.context.get('request')
-        
-        if request and request.user.is_authenticated:
-            validated_data['requester'] = request.user
-        
-        # Créer l'opération
-        operation = OperationRequest.objects.create(**validated_data)
-        
-        # Créer les sous-catégories
-        for subcategory_data in subcategories_data:
-            OperationSubcategory.objects.create(
-                operation_request=operation,
-                **subcategory_data
-            )
-        
-        return operation
-    
-    def update(self, instance, validated_data):
-        """Mise à jour d'une demande d'opération avec sous-catégories"""
-        subcategories_data = validated_data.pop('subcategories', [])
-        
-        # Mettre à jour les champs de l'opération
-        for attr, value in validated_data.items():
-            setattr(instance, attr, value)
-        instance.save()
-        
-        # Mettre à jour les sous-catégories
-        if subcategories_data:
-            # Supprimer les anciennes sous-catégories
-            instance.subcategories.all().delete()
-            
-            # Créer les nouvelles sous-catégories
-            for subcategory_data in subcategories_data:
-                OperationSubcategory.objects.create(
-                    operation_request=instance,
-                    **subcategory_data
-                )
-        
-        return instance

@@ -10,8 +10,9 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
 from reportlab.lib.units import inch
 from datetime import datetime
-from .models import Invoice, Expense, Budget, OperationRequest, OperationSubcategory
-from .serializers import InvoiceSerializer, ExpenseSerializer, BudgetSerializer, OperationRequestSerializer, OperationRequestWithSubcategoriesSerializer
+from .models import Invoice, Expense, Budget, OperationRequest
+from .serializers import InvoiceSerializer, ExpenseSerializer, BudgetSerializer, OperationRequestSerializer
+
 
 class InvoiceViewSet(viewsets.ModelViewSet):
     queryset = Invoice.objects.all().select_related('client', 'project').order_by('-created_at')
@@ -238,6 +239,50 @@ class ExpenseViewSet(viewsets.ModelViewSet):
             count=Count('id')
         )
         return Response(expenses_by_category)
+    
+    @action(detail=False, methods=['get'])
+    def project_summary(self, request):
+        """Résumé des statistiques des dépenses pour un projet spécifique"""
+        project_id = request.query_params.get('project')
+        if not project_id:
+            return Response({'error': 'Paramètre project requis'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        queryset = self.get_queryset().filter(project_id=project_id)
+        
+        # Total dépensé (toutes les dépenses approuvées)
+        total_depense = queryset.filter(
+            status='approved'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        # Total dépensé par source de financement
+        total_budget_projet = queryset.filter(
+            status='approved',
+            fund_source__in=['project_budget', None]
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        total_caisse_operations = queryset.filter(
+            status='approved',
+            fund_source='operation_cash'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        total_fonds_urgence = queryset.filter(
+            status='approved',
+            fund_source='emergency_fund'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        # Total général approuvé
+        total_global = queryset.filter(
+            status='approved'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        
+        return Response({
+            'total_depense': float(total_depense),
+            'total_budget_projet': float(total_budget_projet),
+            'total_caisse_operations': float(total_caisse_operations),
+            'total_fonds_urgence': float(total_fonds_urgence),
+            'total_global': float(total_global),
+            'total_count': queryset.filter(status='approved').count(),
+        })
 
 class BudgetViewSet(viewsets.ModelViewSet):
     queryset = Budget.objects.all().select_related('project').order_by('-period_start')
@@ -277,8 +322,9 @@ class OperationRequestViewSet(viewsets.ModelViewSet):
     """ViewSet pour la gestion des demandes d'opération"""
     queryset = OperationRequest.objects.all().select_related(
         'project', 'requester', 'validated_by'
-    ).prefetch_related('subcategories').order_by('-request_date')
-    serializer_class = OperationRequestWithSubcategoriesSerializer
+    ).order_by('-request_date')
+    serializer_class = OperationRequestSerializer
+
     filter_backends = [filters.SearchFilter, filters.OrderingFilter, DjangoFilterBackend]
     search_fields = ['task_name', 'reference', 'description']
     filterset_fields = ['status', 'project', 'period']
@@ -344,7 +390,9 @@ class OperationRequestViewSet(viewsets.ModelViewSet):
         # Mise à jour du statut
         operation.status = 'validated'
         operation.validated_by = request.user
-        operation.validation_date = request.data.get('validation_date')
+        # Utiliser la date fournie ou la date du jour
+        from django.utils import timezone
+        operation.validation_date = request.data.get('validation_date') or timezone.now().date()
         operation.save()
         
         # NOTE: La déduction du budget se fera lors du paiement, pas lors de la validation
@@ -380,10 +428,9 @@ class OperationRequestViewSet(viewsets.ModelViewSet):
         operation.status = 'paid'
         operation.save()
         
-        # Mise à jour du budget du projet (déduction au moment du paiement)
-        if operation.project:
-            operation.project.spent += operation.total_amount
-            operation.project.save()
+        # NOTE: La mise à jour de project.spent est gérée automatiquement
+        # par le signal sync_project_on_operation_change dans projects/signals.py
+        # qui appelle project.sync_with_finance() quand le statut passe à 'paid'
         
         serializer = self.get_serializer(operation)
         return Response(serializer.data)
@@ -449,6 +496,40 @@ class OperationRequestViewSet(viewsets.ModelViewSet):
             'by_status': by_status,
             'by_period': by_period,
             'average_amount': float(total_amount / total_count) if total_count > 0 else 0
+        })
+    
+    @action(detail=False, methods=['get'])
+    def project_summary(self, request):
+        """Résumé des statistiques des opérations pour un projet spécifique"""
+        project_id = request.query_params.get('project')
+        if not project_id:
+            return Response({'error': 'Paramètre project requis'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        queryset = self.get_queryset().filter(project_id=project_id)
+        
+        total_demande = queryset.aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        total_valide = queryset.filter(
+            status__in=['validated', 'paid']
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        total_paye = queryset.filter(
+            status='paid'
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        reste_a_payer = queryset.filter(
+            status__in=['validated', 'submitted']
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        return Response({
+            'total_demande': float(total_demande),
+            'total_valide': float(total_valide),
+            'total_paye': float(total_paye),
+            'reste_a_payer': float(reste_a_payer),
+            'total_count': queryset.count(),
+            'valide_count': queryset.filter(status__in=['validated', 'paid']).count(),
+            'paye_count': queryset.filter(status='paid').count(),
+            'en_attente_count': queryset.filter(status__in=['validated', 'submitted']).count(),
         })
     
     @action(detail=False, methods=['get'])

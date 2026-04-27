@@ -143,39 +143,8 @@ class Expense(models.Model):
         }
         return workflow.get(self.status, self.status)
 
-
-class OperationSubcategory(models.Model):
-    """
-    Modèle pour stocker les sous-catégories avec leurs montants pour chaque demande d'opération.
-    Permet une meilleure gestion et reporting des dépenses par sous-catégorie.
-    """
-    operation_request = models.ForeignKey(
-        'OperationRequest', 
-        on_delete=models.CASCADE, 
-        related_name='subcategories',
-        verbose_name="Demande d'opération"
-    )
-    name = models.CharField(
-        max_length=100, 
-        verbose_name="Nom de la sous-catégorie"
-    )
-    amount = models.DecimalField(
-        max_digits=10, 
-        decimal_places=2,
-        verbose_name="Montant (GNF)"
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        verbose_name = "Sous-catégorie d'opération"
-        verbose_name_plural = "Sous-catégories d'opération"
-        ordering = ['created_at']
-    
-    def __str__(self):
-        return f"{self.name} - {self.amount} GNF (Opération: {self.operation_request.reference})"
-
 class Budget(models.Model):
+
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='budgets', null=True, blank=True)
     department = models.CharField(max_length=100, blank=True)
     category = models.CharField(max_length=100)
@@ -228,24 +197,12 @@ class OperationRequest(models.Model):
     validation_date = models.DateField(null=True, blank=True)
     rejection_reason = models.TextField(blank=True, verbose_name="Raison du rejet")
     payment_proof = models.FileField(upload_to='payment_proofs/%Y/%m/%d/', null=True, blank=True, verbose_name="Justificatif de paiement")
+    quote = models.FileField(upload_to='quotes/%Y/%m/%d/', null=True, blank=True, verbose_name="Devis / Devis joint")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
-    # NOUVEAUX CHAMPS : Catégories budgétaires et sous-catégories
-    category = models.CharField(
-        max_length=200, 
-        blank=True,
-        verbose_name="Catégorie(s) budgétaire(s)",
-        help_text="Catégories séparées par des virgules (ex: 'materials,labor,equipment')"
-    )
-    subcategory = models.CharField(
-        max_length=100, 
-        blank=True, 
-        verbose_name="Sous-catégorie",
-        help_text="Sous-catégorie optionnelle (ex: 'Papeterie' pour Matériaux)"
-    )
-    
     class Meta:
+
         verbose_name = "Demande d'opération"
         verbose_name_plural = "Demandes d'opération"
         ordering = ['-request_date']
@@ -263,11 +220,7 @@ class OperationRequest(models.Model):
             random_num = random.randint(1000, 9999)
             self.reference = f"OP-{date_str}-{random_num}"
         
-        # Validation des transitions de statut
-        if self.status == 'validated' and not self.validated_by:
-            # Ne peut pas être validé sans validateur
-            self.status = 'submitted'
-        
+        # Si le statut passe à 'validated', s'assurer que la date de validation est définie
         if self.status == 'validated' and not self.validation_date:
             from django.utils import timezone
             self.validation_date = timezone.now().date()
@@ -350,6 +303,7 @@ class OperationRequest(models.Model):
             'draft': 'Brouillon - En cours de saisie',
             'submitted': 'Soumis - En attente de validation',
             'validated': 'Validé - Opération approuvée',
+            'paid': 'Payé - Opération exécutée',
             'rejected': 'Rejeté - Opération refusée'
         }
         return workflow.get(self.status, self.status)

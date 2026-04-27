@@ -108,7 +108,7 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
       const data = Array.isArray(response) ? response : response.results || response.data || []
       setClients(data as Client[])
     } catch (err) {
-      console.error("Error loading clients:", err)
+      console.error("Erreur lors du chargement des clients :", err)
     } finally {
       setLoading(false)
     }
@@ -120,7 +120,7 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
       const data = Array.isArray(response) ? response : response.results || response.data || []
       setProjects(data as Project[])
     } catch (err) {
-      console.error("Error loading projects:", err)
+      console.error("Erreur lors du chargement des projets :", err)
     }
   }
 
@@ -207,9 +207,9 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{initialData ? "Edit Invoice" : "Create New Invoice"}</DialogTitle>
+          <DialogTitle>{initialData ? "Modifier la Facture" : "Créer une Nouvelle Facture"}</DialogTitle>
           <DialogDescription>
-            {initialData ? "Update invoice information" : "Create a new invoice for a client"}
+            {initialData ? "Mettre à jour les informations de la facture" : "Créer une nouvelle facture pour un client"}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -223,7 +223,7 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
                   disabled={loading}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder={loading ? "Loading clients..." : "Select a client"} />
+                    <SelectValue placeholder={loading ? "Chargement des clients..." : "Sélectionner un client"} />
                   </SelectTrigger>
                   <SelectContent>
                     {clients.map((client) => (
@@ -235,13 +235,13 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="project">Project *</Label>
+                <Label htmlFor="project">Projet *</Label>
                 <Select
                   value={formData.projectId}
                   onValueChange={(value) => setFormData({ ...formData, projectId: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select a project" />
+                    <SelectValue placeholder="Sélectionner un projet" />
                   </SelectTrigger>
                   <SelectContent>
                     {projects.map((project) => (
@@ -256,21 +256,21 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="status">Status *</Label>
+                <Label htmlFor="status">Statut *</Label>
                 <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="draft">Draft</SelectItem>
-                    <SelectItem value="sent">Sent</SelectItem>
-                    <SelectItem value="paid">Paid</SelectItem>
-                    <SelectItem value="overdue">Overdue</SelectItem>
+                    <SelectItem value="draft">Brouillon</SelectItem>
+                    <SelectItem value="sent">Envoyée</SelectItem>
+                    <SelectItem value="paid">Payée</SelectItem>
+                    <SelectItem value="overdue">En Retard</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dueDate">Due Date *</Label>
+                <Label htmlFor="dueDate">Date d'Échéance *</Label>
                 <Input
                   id="dueDate"
                   type="date"
@@ -294,12 +294,12 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
               </div>
             </div>
 
-            <div className="space-y-2">
+              <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Invoice Items *</Label>
+                <Label>Articles de la Facture *</Label>
                 <Button type="button" size="sm" onClick={addItem}>
                   <Plus className="h-4 w-4 mr-1" />
-                  Add Item
+                  Ajouter un Article
                 </Button>
               </div>
               <div className="space-y-2">
@@ -314,7 +314,7 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
                       />
                       <Input
                         type="number"
-                        placeholder="Quantity"
+                        placeholder="Quantité"
                         value={item.quantity || 1}
                         onChange={(e) => updateItem(index, "quantity", Number(e.target.value))}
                         required
@@ -322,7 +322,7 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
                       <Input
                         type="number"
                         step="0.01"
-                        placeholder="Unit Price"
+                        placeholder="Prix Unitaire"
                         value={item.unit_price || 0}
                         onChange={(e) => updateItem(index, "unit_price", Number(e.target.value))}
                         required
@@ -338,13 +338,13 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
               </div>
             </div>
 
-            <div className="space-y-2">
+              <div className="space-y-2">
               <Label htmlFor="notes">Notes</Label>
               <Textarea
                 id="notes"
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Additional notes or payment terms"
+                placeholder="Notes additionnelles ou conditions de paiement"
                 rows={3}
               />
             </div>
@@ -357,9 +357,9 @@ export function InvoiceFormDialog({ open, onOpenChange, onSubmit, initialData }:
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+              Annuler
             </Button>
-            <Button type="submit">{initialData ? "Update" : "Create"} Invoice</Button>
+            <Button type="submit">{initialData ? "Mettre à jour" : "Créer"} la Facture</Button>
           </DialogFooter>
         </form>
       </DialogContent>

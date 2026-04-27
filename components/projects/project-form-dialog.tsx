@@ -64,7 +64,7 @@ export function ProjectFormDialog({ open, onOpenChange, onSubmit, project }: Pro
       end_date: project?.end_date || "",
       budget: project?.budget?.toString() || "",
       manager: project?.manager?.toString() || "",
-      team: project?.team?.map(t => t.toString()) || [],
+      team: project?.team?.map((t: any) => t.toString()) || [],
     }
   })
 
@@ -80,7 +80,7 @@ export function ProjectFormDialog({ open, onOpenChange, onSubmit, project }: Pro
         end_date: project.end_date || "",
         budget: project.budget?.toString() || "",
         manager: project.manager?.toString() || "",
-        team: project.team?.map(t => t.toString()) || [],
+        team: project.team?.map((t: any) => t.toString()) || [],
       })
     } else {
       reset({
@@ -195,7 +195,8 @@ export function ProjectFormDialog({ open, onOpenChange, onSubmit, project }: Pro
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">Description *</Label>
+
             <Textarea
               id="description"
               {...register("description")}

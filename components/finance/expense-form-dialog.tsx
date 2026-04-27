@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
+import { api } from "@/lib/api"
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { CATEGORY_OPTIONS, getCategoryName, SUBCATEGORY_EXAMPLES } from "@/lib/categories"
-import { Plus, Trash2, ChevronDown, ChevronUp } from "lucide-react"
+import { Plus, Trash2, ChevronDown, ChevronUp, Upload, FileText, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface ExpenseFormDialogProps {
@@ -36,10 +37,34 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
       amount: 0,
       date: new Date().toISOString().split("T")[0],
       project: "",
-      status: "draft",
+      status: "approved",
       notes: "",
+      fund_source: "project_budget",
     },
   )
+  
+  const [projects, setProjects] = useState<Array<{ id: string; name: string }>>([])
+  const [projectsLoading, setProjectsLoading] = useState(false)
+  
+  // Charger la liste des projets
+  useEffect(() => {
+    const loadProjects = async () => {
+      try {
+        setProjectsLoading(true)
+        const response = await api.projects.list() as any
+        const projectList = Array.isArray(response) ? response : response.results || response.data || []
+        setProjects(projectList.map((p: any) => ({ id: String(p.id), name: p.name })))
+      } catch (err) {
+        console.error("Erreur chargement projets:", err)
+      } finally {
+        setProjectsLoading(false)
+      }
+    }
+    
+    if (open && !projectId) {
+      loadProjects()
+    }
+  }, [open, projectId])
   
   interface SubcategoryItem {
     id: string
@@ -48,6 +73,16 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
   }
   
   const [subcategories, setSubcategories] = useState<SubcategoryItem[]>(() => {
+    // Priorité 1: Utiliser le tableau subcategories s'il existe et n'est pas vide
+    if (initialData?.subcategories && Array.isArray(initialData.subcategories) && initialData.subcategories.length > 0) {
+      return initialData.subcategories.map((item: any, index: number) => ({
+        id: `subcat-${Date.now()}-${index}`,
+        name: item.name || '',
+        amount: typeof item.amount === 'number' ? item.amount : 0
+      }))
+    }
+    
+    // Priorité 2: Utiliser le champ subcategory (chaîne simple ou avec virgules)
     if (initialData?.subcategory) {
       // Si la sous-catégorie contient des virgules, on la sépare en plusieurs éléments
       if (initialData.subcategory.includes(',')) {
@@ -76,6 +111,7 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
   const [newSubcategory, setNewSubcategory] = useState("")
   const [newSubcategoryAmount, setNewSubcategoryAmount] = useState("")
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
   
   // Calculer le montant total automatiquement
   const totalAmount = subcategories.reduce((sum, item) => sum + item.amount, 0)
@@ -89,10 +125,47 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     
+    // Validation des champs obligatoires
+    const errors: string[] = []
+    
+    if (!formData.description.trim()) {
+      errors.push("La description est obligatoire")
+    }
+    
+    if (!formData.category) {
+      errors.push("La catégorie est obligatoire")
+    }
+    
+    const mainAmount = totalAmount > 0 ? totalAmount : formData.amount
+    if (!mainAmount || mainAmount <= 0) {
+      errors.push("Le montant doit être supérieur à 0")
+    }
+    
+    if (!formData.date) {
+      errors.push("La date est obligatoire")
+    }
+    
     // Validation des sous-catégories
     const hasInvalidAmount = subcategories.some(item => item.amount <= 0)
     if (hasInvalidAmount) {
-      alert("❌ Tous les montants des sous-catégories doivent être positifs!")
+      errors.push("Tous les montants des sous-catégories doivent être positifs")
+    }
+    
+    // Validation: Pas de doublons dans les sous-catégories
+    const names = subcategories.map(item => item.name.toLowerCase())
+    const hasDuplicates = names.length !== new Set(names).size
+    if (hasDuplicates) {
+      errors.push("Les noms des sous-catégories ne doivent pas être en double")
+    }
+    
+    // Validation du total des sous-catégories vs montant principal
+    const totalSubcategories = subcategories.reduce((sum, item) => sum + item.amount, 0)
+    if (subcategories.length > 0 && Math.abs(totalSubcategories - mainAmount) > 0.01) {
+      errors.push(`Le total des sous-catégories (${totalSubcategories.toFixed(2)}) ne correspond pas au montant principal (${mainAmount.toFixed(2)})`)
+    }
+    
+    if (errors.length > 0) {
+      alert(`❌ Erreurs de validation:\n\n${errors.join('\n')}`)
       return
     }
     
@@ -107,9 +180,9 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
     }
     
     // Préparer les données pour la soumission avec structure JSON améliorée
-    const submissionData = {
+    const submissionData: any = {
       ...formData,
-      amount: totalAmount > 0 ? totalAmount : formData.amount,
+      amount: mainAmount,
       project: projectValue,
       // Structure JSON pour les sous-catégories (au lieu d'une simple chaîne)
       subcategories: subcategories.length > 0 ? subcategories.map(item => ({
@@ -120,6 +193,12 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
       subcategory: subcategories.map(item => item.name).join(', ') || ''
     }
     
+    // Ajouter le fichier s'il existe
+    if (receiptFile) {
+      submissionData.receiptFile = receiptFile
+    }
+    
+    console.log("Données soumises:", submissionData)
     onSubmit(submissionData)
     onOpenChange(false)
   }
@@ -169,7 +248,7 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
     setShowSuggestions(false)
     // Focus sur le champ montant
     setTimeout(() => {
-      const amountInput = document.querySelector('input[placeholder="Montant ($)"]') as HTMLInputElement
+      const amountInput = document.getElementById('new-amount') as HTMLInputElement
       if (amountInput) amountInput.focus()
     }, 100)
   }
@@ -286,7 +365,7 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
               <div className="space-y-4">
                 {/* Montant principal */}
                 <div className="space-y-2">
-                  <Label htmlFor="amount" className="font-medium">Montant total ($) *</Label>
+                  <Label htmlFor="amount" className="font-medium">Montant total (GNF) *</Label>
                   <div className="relative">
                     <Input
                       id="amount"
@@ -296,10 +375,10 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
                       onChange={(e) => setFormData({ ...formData, amount: Number(e.target.value) })}
                       required
                       placeholder="0.00"
-                      className="h-10 pl-8"
+                      className="h-10 pl-12"
                     />
-                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                      $
+                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground text-sm font-medium">
+                      GNF
                     </div>
                   </div>
                   {subcategories.length > 0 && (
@@ -357,7 +436,7 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
                               className="h-8 w-24 text-right"
                               placeholder="0.00"
                             />
-                            <span className="text-sm font-medium">$</span>
+                            <span className="text-sm font-medium">GNF</span>
                             <Button
                               type="button"
                               variant="ghost"
@@ -392,7 +471,7 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
                       </div>
                       <div className="space-y-1">
                         <Label htmlFor="new-amount" className="text-sm">
-                          Montant ($)
+                          Montant (GNF)
                         </Label>
                         <div className="flex gap-2">
                           <Input
@@ -433,6 +512,51 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
               </h3>
               
               <div className="space-y-4">
+                {/* Source de financement */}
+                <div className="space-y-2">
+                  <Label htmlFor="fund_source" className="font-medium">Source de financement</Label>
+                  <Select
+                    value={formData.fund_source || "project_budget"}
+                    onValueChange={(value) => setFormData({ ...formData, fund_source: value })}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Choisir la source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="project_budget">
+                        <div className="flex items-center gap-2">
+                          <span>💰</span>
+                          <span>Budget projet</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="operation_cash">
+                        <div className="flex items-center gap-2">
+                          <span>🏦</span>
+                          <span>Caisse opérations</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="emergency_fund">
+                        <div className="flex items-center gap-2">
+                          <span>🚨</span>
+                          <span>Fonds d'urgence</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="other">
+                        <div className="flex items-center gap-2">
+                          <span>📋</span>
+                          <span>Autre</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {formData.fund_source === "project_budget" && "💰 La dépense sera déduite du budget du projet"}
+                    {formData.fund_source === "operation_cash" && "🏦 La dépense sera déduite de la caisse des opérations"}
+                    {formData.fund_source === "emergency_fund" && "🚨 La dépense sera déduite du fonds d'urgence"}
+                    {formData.fund_source === "other" && "📋 Source de financement non spécifiée"}
+                  </p>
+                </div>
+
                 {/* Projet */}
                 <div className="space-y-2">
                   <Label htmlFor="project" className="font-medium">Projet associé</Label>
@@ -453,18 +577,88 @@ export function ExpenseFormDialog({ open, onOpenChange, onSubmit, initialData, p
                     </div>
                   ) : (
                     <>
-                      <Input
-                        id="project"
+                      <Select
                         value={formData.project}
-                        onChange={(e) => setFormData({ ...formData, project: e.target.value })}
-                        placeholder="ID du projet associé"
-                        className="h-10"
-                      />
-                      <p className="text-xs text-muted-foreground">Laissez vide si pas de projet associé</p>
+                        onValueChange={(value) => setFormData({ ...formData, project: value })}
+                        disabled={projectsLoading}
+                      >
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder={projectsLoading ? "Chargement..." : "Choisir un projet"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {projects.map((project) => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">Sélectionnez un projet dans la liste</p>
                     </>
                   )}
                 </div>
                 
+                {/* Justificatif / Reçu */}
+                <div className="space-y-2">
+                  <Label className="font-medium flex items-center gap-2">
+                    <Upload className="h-4 w-4" />
+                    Justificatif (reçu)
+                  </Label>
+                  
+                  {!receiptFile ? (
+                    <div className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 hover:border-primary/50 hover:bg-primary/5 transition-colors cursor-pointer">
+                      <label className="flex flex-col items-center gap-2 cursor-pointer">
+                        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Upload className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-sm font-medium">Cliquez pour ajouter un justificatif</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            PDF, JPG, PNG ou DOC (max 5 Mo)
+                          </p>
+                        </div>
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) {
+                              if (file.size > 5 * 1024 * 1024) {
+                                alert("❌ Le fichier ne doit pas dépasser 5 Mo")
+                                return
+                              }
+                              setReceiptFile(file)
+                            }
+                          }}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/20">
+                      <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{receiptFile.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(receiptFile.size / 1024).toFixed(1)} Ko
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setReceiptFile(null)}
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        title="Supprimer le fichier"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
                 {/* Notes */}
                 <div className="space-y-2">
                   <Label htmlFor="notes" className="font-medium">Notes internes</Label>

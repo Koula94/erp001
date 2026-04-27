@@ -52,8 +52,8 @@ export function BudgetsTab() {
       setBudgets(data as Budget[])
       setError(null)
     } catch (err) {
-      setError("Failed to load budgets")
-      console.error("Error loading budgets:", err)
+      setError("Échec du chargement des budgets")
+      console.error("Erreur lors du chargement des budgets :", err)
     } finally {
       setLoading(false)
     }
@@ -92,8 +92,8 @@ export function BudgetsTab() {
       }
       setEditingBudget(null)
     } catch (err) {
-      setError("Failed to save budget")
-      console.error("Error saving budget:", err)
+      setError("Échec de l'enregistrement du budget")
+      console.error("Erreur lors de l'enregistrement du budget :", err)
     }
   }
 
@@ -109,8 +109,8 @@ export function BudgetsTab() {
       setBudgets(budgets.filter((b) => b.id !== budgetId))
       setDeletingBudgetId(null)
     } catch (err) {
-      setError("Failed to delete budget")
-      console.error("Error deleting budget:", err)
+      setError("Échec de la suppression du budget")
+      console.error("Erreur lors de la suppression du budget :", err)
     }
   }
 
@@ -120,7 +120,7 @@ export function BudgetsTab() {
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search budgets..."
+            placeholder="Rechercher des budgets..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-8"
@@ -133,7 +133,7 @@ export function BudgetsTab() {
           }}
         >
           <Plus className="mr-2 h-4 w-4" />
-          Create Budget
+          Créer un Budget
         </Button>
       </div>
 
@@ -146,7 +146,7 @@ export function BudgetsTab() {
       <Card>
         <CardHeader>
           <CardTitle>Budgets</CardTitle>
-          <CardDescription>Manage project and department budgets</CardDescription>
+          <CardDescription>Gérez les budgets des projets et départements</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -156,8 +156,8 @@ export function BudgetsTab() {
           ) : filteredBudgets.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>{searchQuery ? "No budgets found matching your search" : "No budgets found"}</p>
-              <p className="text-sm">Create your first budget to get started</p>
+              <p>{searchQuery ? "Aucun budget ne correspond à votre recherche" : "Aucun budget trouvé"}</p>
+              <p className="text-sm">Créez votre premier budget pour commencer</p>
             </div>
           ) : (
             <div className="grid gap-4">
@@ -191,7 +191,7 @@ export function BudgetsTab() {
                     <CardContent className="space-y-4">
                       <div>
                         <div className="flex items-center justify-between text-sm mb-2">
-                          <span className="text-muted-foreground">Budget Usage</span>
+                          <span className="text-muted-foreground">Utilisation du Budget</span>
                           <span className={`font-medium ${isOverBudget ? "text-red-600" : "text-green-600"}`}>
                             {percentage.toFixed(1)}%
                           </span>
@@ -200,15 +200,15 @@ export function BudgetsTab() {
                       </div>
                       <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>
-                          <p className="text-muted-foreground">Allocated</p>
+                          <p className="text-muted-foreground">Alloué</p>
                           <p className="font-medium text-lg">${budget.planned_amount.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Spent</p>
+                          <p className="text-muted-foreground">Dépensé</p>
                           <p className="font-medium text-lg">${budget.spent_amount.toLocaleString()}</p>
                         </div>
                         <div>
-                          <p className="text-muted-foreground">Remaining</p>
+                          <p className="text-muted-foreground">Restant</p>
                           <p className={`font-medium text-lg ${remaining < 0 ? "text-red-600" : "text-green-600"}`}>
                             ${remaining.toLocaleString()}
                           </p>
@@ -221,8 +221,8 @@ export function BudgetsTab() {
                         </span>
                         <div className="flex items-center gap-2">
                           <Button variant="ghost" size="sm" onClick={() => handleEditBudget(budget)}>
-                            <Edit className="h-3 w-3 mr-1" />
-                            Edit
+                          <Edit className="h-3 w-3 mr-1" />
+                            Modifier
                           </Button>
                         </div>
                       </div>

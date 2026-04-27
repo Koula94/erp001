@@ -176,24 +176,24 @@ class Project(models.Model):
             return 'low'
     
     def calculate_spent_from_finance(self):
-        """Calcule automatiquement le montant dépensé basé sur les données finance"""
+        """Calcule automatiquement le montant dépensé basé sur les données finance.
+        
+        Logique:
+        - Le budget du projet (project.budget) est utilisé par les opérations
+        - Quand une opération est payée, elle déduit du budget projet
+        - Les dépenses sont prélevées sur la caisse des opérations, PAS sur le budget projet
+        """
         try:
-            from finance.models import Expense, Invoice
+            from finance.models import OperationRequest
             
-            # Somme des dépenses approuvées liées au projet
-            approved_expenses = Expense.objects.filter(
-                project=self, 
-                status='approved'
-            ).aggregate(total=models.Sum('amount'))['total'] or 0
-            
-            # Somme des factures payées liées au projet
-            paid_invoices = Invoice.objects.filter(
+            # Somme des opérations payées liées au projet (ce qui a été réellement décaissé)
+            paid_operations = OperationRequest.objects.filter(
                 project=self,
                 status='paid'
-            ).aggregate(total=models.Sum('amount'))['total'] or 0
+            ).aggregate(total=models.Sum('total_amount'))['total'] or 0
             
-            # Total dépensé = dépenses approuvées + factures payées
-            total_spent = approved_expenses + paid_invoices
+            # Total dépensé = opérations payées (seules les opérations impactent le budget projet)
+            total_spent = paid_operations
             
             return total_spent
             

@@ -3,19 +3,11 @@ Workflow complet de gestion des dépenses
 Intégration automatique entre projets et finance
 """
 
-import os
-import sys
-import django
 from django.db import models
 from django.db.models import Sum
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
-
-# Configuration Django
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'sofixe_erp.settings')
-django.setup()
 
 from projects.models import Project, Task
 from finance.models import Expense, Invoice, Budget
@@ -132,9 +124,20 @@ class ExpenseWorkflow:
     # Les dépenses sont maintenant simplement approuvées et considérées comme engagées dans le budget
     
     def _validate_budget(self, amount):
-        """Validation du budget disponible"""
+        """Validation du budget disponible selon la source de financement"""
         if not self.project:
             return {'valid': True, 'message': 'Aucun projet associé'}
+        
+        # Vérifier la source de financement
+        fund_source = getattr(self.expense, 'fund_source', 'project_budget')
+        
+        # Si la source n'est pas le budget projet, on ne valide pas le budget projet
+        if fund_source != 'project_budget':
+            return {
+                'valid': True,
+                'message': f'Source: {fund_source} - Validation budget projet non requise',
+                'warnings': []
+            }
         
         # Conversion en float pour les calculs
         project_budget = float(self.project.budget or 0)
@@ -166,29 +169,77 @@ class ExpenseWorkflow:
         }
     
     def _update_project_budget(self):
-        """Mise à jour automatique du budget du projet"""
+        """Mise à jour automatique du budget du projet selon la source de financement"""
         if not self.project:
             return
         
-        # Recalcul du budget dépensé (seulement les dépenses approuvées)
-        approved_expenses = Expense.objects.filter(
-            project=self.project,
-            status='approved'
-        ).aggregate(total=Sum('amount'))['total'] or 0
+        # Vérifier la source de financement de la dépense
+        fund_source = getattr(self.expense, 'fund_source', 'project_budget')
         
-        paid_invoices = Invoice.objects.filter(
-            project=self.project,
-            status='paid'
-        ).aggregate(total=Sum('amount'))['total'] or 0
+        if fund_source == 'project_budget':
+            # Recalcul du budget dépensé (seulement les dépenses approuvées avec source budget projet)
+            approved_expenses = Expense.objects.filter(
+                project=self.project,
+                status='approved',
+                fund_source='project_budget'
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
+            paid_invoices = Invoice.objects.filter(
+                project=self.project,
+                status='paid'
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
+            total_spent = approved_expenses + paid_invoices
+            
+            # Mise à jour du projet
+            self.project.spent = total_spent
+            self.project.save()
+            
+            print(f"💰 Dépense déduite du budget projet: {self.expense.amount}")
+            
+        elif fund_source == 'operation_cash':
+            # La dépense est déduite de la caisse des opérations
+            # On ne met pas à jour project.spent car ce n'est pas le budget projet qui est utilisé
+            print(f"🏦 Dépense déduite de la caisse des opérations: {self.expense.amount}")
+            
+            # Créer une notification pour la caisse
+            self.notifications.append({
+                'type': 'cash_withdrawal',
+                'title': 'Prélèvement caisse opérations',
+                'message': f'Dépense "{self.expense.description}" de {self.expense.amount} GNF prélevée de la caisse opérations',
+                'recipients': ['finance_team', 'accounting']
+            })
+            
+        elif fund_source == 'emergency_fund':
+            # La dépense est déduite du fonds d'urgence
+            print(f"🚨 Dépense déduite du fonds d'urgence: {self.expense.amount}")
+            
+            self.notifications.append({
+                'type': 'emergency_fund_used',
+                'title': 'Utilisation du fonds d\'urgence',
+                'message': f'Dépense "{self.expense.description}" de {self.expense.amount} GNF prélevée du fonds d\'urgence',
+                'recipients': ['finance_team', 'management']
+            })
+            
+        else:
+            # Autre source - comportement par défaut (budget projet)
+            approved_expenses = Expense.objects.filter(
+                project=self.project,
+                status='approved'
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
+            paid_invoices = Invoice.objects.filter(
+                project=self.project,
+                status='paid'
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            
+            total_spent = approved_expenses + paid_invoices
+            self.project.spent = total_spent
+            self.project.save()
         
-        total_spent = approved_expenses + paid_invoices
-        
-        # Mise à jour du projet
-        self.project.spent = total_spent
-        self.project.save()
-        
-        # Vérification des alertes budget
-        self._check_budget_alerts()
+        # Vérification des alertes budget (uniquement pour le budget projet)
+        if fund_source == 'project_budget':
+            self._check_budget_alerts()
     
     def _create_accounting_entry(self):
         """Création de l'engagement comptable"""
@@ -274,10 +325,11 @@ class ExpenseWorkflow:
     
     def _notify_creation(self):
         """Notification de création"""
+        project_name = self.project.name if self.project else 'Sans projet'
         self.notifications.append({
             'type': 'expense_created',
             'title': 'Nouvelle dépense créée',
-            'message': f'Dépense "{self.expense.description}" créée pour le projet {self.project.name}',
+            'message': f'Dépense "{self.expense.description}" créée pour le projet {project_name}',
             'recipients': ['project_manager', 'finance_team']
         })
     

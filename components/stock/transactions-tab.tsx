@@ -41,7 +41,6 @@ export function TransactionsTab() {
     try {
       setLoading(true)
       const response = await api.stockTransactions.list() as any
-      console.log("Transactions API response:", response)
       // Handle different response formats
       const data = Array.isArray(response) ? response : 
                    (response as any)?.results || (response as any)?.data || []
@@ -70,7 +69,6 @@ export function TransactionsTab() {
         reference: data.reference,
         notes: data.notes,
       }
-      console.log("Sending transaction data to API:", apiData)
       const newTransaction = await api.stockTransactions.create(apiData)
       setTransactionsData([newTransaction, ...transactionsData])
     } catch (error) {

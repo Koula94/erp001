@@ -1,5 +1,6 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
+from django.db.models import Sum
 from .models import Project, Task
 
 @receiver(post_save, sender=Task)
@@ -38,45 +39,54 @@ def sync_project_on_task_delete(sender, instance, **kwargs):
     except Exception as e:
         print(f"Erreur lors de la synchronisation après suppression de tâche: {e}")
 
-# Signaux pour la synchronisation budget-finance
-@receiver(post_save, sender='finance.Expense')
-@receiver(post_save, sender='finance.Invoice')
-def sync_project_on_finance_change(sender, instance, **kwargs):
-    """
-    Synchronise automatiquement le budget du projet lorsqu'une dépense ou facture est modifiée
-    """
-    try:
-        if instance.project:
-            project = instance.project
-            finance_sync_result = project.sync_with_finance()
-            
-            # Sauvegarder les changements si nécessaire
-            if finance_sync_result['spent_changed']:
-                project.save()
-                print(f"Budget du projet {project.name} synchronisé automatiquement: "
-                      f"dépensé={finance_sync_result['new_spent']}, "
-                      f"budget utilisé={finance_sync_result['budget_used_percentage']:.1f}%, "
-                      f"statut={finance_sync_result['budget_status']}")
-    except Exception as e:
-        print(f"Erreur lors de la synchronisation budget du projet: {e}")
+# ============================================================
+# SIGNAL DE SYNCHRONISATION BUDGET - Opérations (nouvelle logique)
+# ============================================================
+# Logique:
+# - Le budget du projet (project.budget) est utilisé par les opérations
+# - Quand une opération est payée, elle déduit du budget projet (project.spent)
+# - Les dépenses sont prélevées sur la caisse des opérations, PAS sur le budget projet
+# ============================================================
 
-@receiver(post_delete, sender='finance.Expense')
-@receiver(post_delete, sender='finance.Invoice')
-def sync_project_on_finance_delete(sender, instance, **kwargs):
+@receiver(post_save, sender='finance.OperationRequest')
+def sync_project_on_operation_change(sender, instance, **kwargs):
     """
-    Synchronise automatiquement le budget du projet lorsqu'une dépense ou facture est supprimée
+    Synchronise automatiquement le budget du projet lorsqu'une opération est modifiée.
+    Se déclenche quand une opération passe en statut 'paid'.
     """
     try:
-        if instance.project:
+        if instance.project and instance.status == 'paid':
             project = instance.project
             finance_sync_result = project.sync_with_finance()
             
             # Sauvegarder les changements si nécessaire
             if finance_sync_result['spent_changed']:
                 project.save()
-                print(f"Budget du projet {project.name} synchronisé après suppression: "
+                print(f"✅ Budget du projet {project.name} synchronisé automatiquement "
+                      f"(opération {instance.reference} payée): "
                       f"dépensé={finance_sync_result['new_spent']}, "
                       f"budget utilisé={finance_sync_result['budget_used_percentage']:.1f}%, "
                       f"statut={finance_sync_result['budget_status']}")
     except Exception as e:
-        print(f"Erreur lors de la synchronisation budget après suppression: {e}")
+        print(f"Erreur lors de la synchronisation budget du projet (opération): {e}")
+
+@receiver(post_delete, sender='finance.OperationRequest')
+def sync_project_on_operation_delete(sender, instance, **kwargs):
+    """
+    Synchronise automatiquement le budget du projet lorsqu'une opération est supprimée.
+    """
+    try:
+        if instance.project and instance.status == 'paid':
+            project = instance.project
+            finance_sync_result = project.sync_with_finance()
+            
+            # Sauvegarder les changements si nécessaire
+            if finance_sync_result['spent_changed']:
+                project.save()
+                print(f"✅ Budget du projet {project.name} synchronisé après suppression "
+                      f"d'opération {instance.reference}: "
+                      f"dépensé={finance_sync_result['new_spent']}, "
+                      f"budget utilisé={finance_sync_result['budget_used_percentage']:.1f}%, "
+                      f"statut={finance_sync_result['budget_status']}")
+    except Exception as e:
+        print(f"Erreur lors de la synchronisation budget après suppression d'opération: {e}")

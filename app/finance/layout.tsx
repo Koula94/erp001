@@ -4,8 +4,8 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { AppHeader } from "@/components/app-header"
 
 export const metadata: Metadata = {
-  title: "Finance & Accounting - Sofixe ERP",
-  description: "Manage invoices, expenses, budgets and financial reports for your business",
+  title: "Finance & Comptabilité - Sofixe ERP",
+  description: "Gérez les factures, dépenses, budgets et rapports financiers de SOFI",
 }
 
 interface FinanceLayoutProps {

@@ -47,7 +47,7 @@ def handle_invoice_payment(sender, instance, created, **kwargs):
 
 def _handle_new_expense(expense):
     """Traitement d'une nouvelle dépense"""
-    print(f"📝 Nouvelle dépense créée: {expense.description} (${expense.amount})")
+    print(f"📝 Nouvelle dépense créée: {expense.description} ({expense.amount} GNF)")
     
     # Notification automatique si dépense importante
     if expense.amount > 1000 and expense.project:
@@ -72,7 +72,7 @@ def _handle_expense_update(expense):
         
         # Vérification des changements de montant
         if original.amount != expense.amount and expense.project:
-            print(f"💰 Changement de montant: ${original.amount} → ${expense.amount}")
+            print(f"💰 Changement de montant: {original.amount} → {expense.amount} GNF")
             _handle_amount_change(expense, original.amount)
             
     except Expense.DoesNotExist:
@@ -87,7 +87,7 @@ def _handle_submission(expense):
     
     # Validation automatique si montant faible
     if expense.amount <= 500:
-        print(f"⚡ Validation automatique pour petite dépense (${expense.amount})")
+        print(f"⚡ Validation automatique pour petite dépense ({expense.amount} GNF)")
         # Pourrait déclencher une approbation automatique
 
 def _handle_approval(expense):
@@ -158,7 +158,7 @@ def _update_project_budget_from_invoice(project):
         project.spent = total_spent
         project.save()
         
-        print(f"📊 Budget projet mis à jour: {project.name} - ${total_spent} dépensés")
+        print(f"📊 Budget projet mis à jour: {project.name} - {total_spent} GNF dépensés")
         
         # Vérification des alertes
         _check_project_budget_alerts(project)
@@ -195,7 +195,7 @@ def _send_high_amount_notification(expense):
     notification = {
         'type': 'high_amount_expense',
         'title': 'Dépense importante créée',
-        'message': f'Nouvelle dépense de ${expense.amount} créée pour {expense.project.name}',
+        'message': f'Nouvelle dépense de {expense.amount} GNF créée pour {expense.project.name}',
         'expense': expense.description,
         'amount': expense.amount,
         'project': expense.project.name
